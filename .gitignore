@@ -15,3 +15,7 @@ node_modules/
 dist/
 output/
 *.log
+
+packed/
+output/
+node_modules/

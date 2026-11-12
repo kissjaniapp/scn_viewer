@@ -1,3 +1,14 @@
+# Változások
+
+## v1.2.0 – saját ablakos Windows alkalmazás és indítási javítás
+- A rejtett PowerShell + böngésző indítás helyett önálló Electron program (`SCN Viewer.exe`).
+- Előző, v1.1-es AppId megőrzése: felültelepítéskor ugyanazt az alkalmazást frissíti.
+- Beépített, csak loopback felületen futó HTTP/API helyi kiszolgáló; nincs fix portütközés.
+- Egységes programablak, Start menü és asztali parancsikon, leállás az ablak bezárásával.
+- Az eddigi forgatás, kijelölés és milliméteres mérés változatlan.
+- SCN-import a KitchenDraw Bridge segítségével változatlanul rendelkezésre áll; KitchenDraw-környezetben még külön tesztelendő.
+- Windows GitHub Actions Artifacts telepítőépítés, helyi API-integrációs teszt.
+
 # SCN Viewer v1.1.0 – Telepítős kiadás
 
 - Inno Setup Windows 11 EXE telepítő; Start menü, opcionális asztali parancsikon, eltávolítás.

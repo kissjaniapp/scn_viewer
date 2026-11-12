@@ -1,34 +1,39 @@
-# SCN Viewer v1.1.0 – Windows telepítő és KitchenDraw SCN megnyitás
+# SCN Viewer v1.2.0 – saját ablakos Windows alkalmazás
 
-Magyar nyelvű, Windows 11-en futtatható **helyi** 3D megjelenítő, a korábbi v0.2 vezérléssel és egy KitchenDraw-hoz kapcsolódó SCN-importfolyamattal.
+**Javítás a v1.1 indulási hibájára:** az előző telepítő rejtett PowerShell-kiszolgálót és böngészőt indított, ezért egyes gépeken az alkalmazás nem jelent meg. A v1.2 önálló **`SCN Viewer.exe`** programot telepít, amely közvetlenül saját asztali ablakot nyit. Nem kell hozzá alapértelmezett böngésző, külön szerver, Python vagy Node.js. A helyi HTTP API az alkalmazáson belül, véletlenszerű szabad loopback porton indul. Az alkalmazás bezárásakor leáll.
 
-> **Fontos működési feltétel:** A KitchenDraw `.scn` saját, bináris jelenetfájl, amelynek teljes 3D tartalma külső katalógusokra hivatkozhat. Az itt mellékelt SCN-t **nem** sikerült teljes 3D modellé dekódolni függetlenül. A közvetlen `.scn` kiválasztást a **KitchenDraw SDK2 bővítmény** teszi lehetővé: a KitchenDraw beolvassa az SCN-t és OBJ-geometriát exportál, amelyet a Viewer automatikusan megjelenít. A KitchenDraw és a megfelelő katalógusok **szükségesek** ehhez, és a bővítményt az adott gépen kell lefordítani és telepíteni. A megoldás ezen a gépen, KitchenDraw futtatókörnyezet hiányában még **nem végtesztelt**.
+## Kész telepítő letöltése: GitHub Actions / Artifacts
 
-## Windows 11 telepítő – GitHub Actions / Artifacts
+1. Nyisd meg a [SCN Viewer Windows telepítő Actions](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml) oldalt.
+2. Kattints a legutóbbi zöld pipás futásra.
+3. Az **Artifacts** résznél töltsd le az **`SCN_Viewer_v1.2.0_Telepito`** csomagot.
+4. Csomagold ki a ZIP-ből a **`SCN_Viewer_v1.2.0_Telepito.exe`** fájlt és futtasd.
+5. Ugyanabba a felhasználói telepítési mappába frissít, mint a v1.1. Hagyja a korábbi SCN adatokat és beállításokat. Megnyitás: **SCN Viewer** ikon az asztalon vagy a Start menüben.
 
-A teljes, magyar nyelvű **`SCN_Viewer_v1.1.0_Telepito.exe`** fájl GitHub Actions segítségével készül, az üzembe helyezéséhez **nem** kell Node.js, Python vagy fejlesztői környezet.
+A telepítő asztali parancsikont, Start menü parancsikont, magyar nyelvű telepítési varázslót és eltávolítást tartalmaz. Nem igényel rendszergazdai jogosultságot. Saját EXE-t telepít a korábbi PowerShell/VBS indító helyett. A program mérete nagyobb lesz, mert a 3D böngészőmotort is tartalmazza.
 
-1. Nyisd meg a [GitHub Actions – Windows telepítő](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml) oldalt.
-2. Válaszd ki a legutóbbi **zöld pipás** `SCN Viewer - Windows telepítő` futást.
-3. Az oldal alján, **Artifacts** résznél kattints a `SCN_Viewer_v1.1.0_Telepito` csomagra. A GitHub egy ZIP-et tölt le, amely tartalmazza az `.exe` telepítőt.
-4. Csomagold ki, és indítsd az `.exe`-t. A telepítő a saját felhasználói mappádba telepít: nem kell rendszergazdai jogosultság.
-5. Létrejön a **Start menü** parancsikon, kérésre az **asztali** parancsikon is. A Viewer indításakor megnyílik az alapértelmezett böngésződben, de csak helyben (`127.0.0.1:8765`) fut.
-6. A Windows **Telepített alkalmazások** listájában az SCN Viewer eltávolítható. A telepítő a nézegetőt offline is használható Three.js csomaggal tartalmazza.
+## Használat
 
-**Kódaláírás:** a CI-ban előállított telepítő nincs kereskedelmi tanúsítvánnyal aláírva, ezért a Windows SmartScreen figyelmeztethet. Az alkalmazást és az egyéb fájlokat a saját GitHub-projektedben ellenőrizheted. A program nem tartalmaz KitchenDraw-licencet, SDK DLL-t vagy semmilyen privát SCN-tervet.
+- **Jobb egérgomb húzva:** 3D forgatás.
+- **Görgő:** zoom; **benyomott görgő húzva:** eltolás.
+- **Bal egérgomb:** szekrény vagy alkatrész kiválasztása; választó a bal oldali panelen.
+- **Méretezés bekapcsolva:** bal kattintással két mérőpont, mm-es távolság és X/Y/Z különbségek.
+- **Fájlmegnyitás:** OBJ/STL/3DS/GLB/GLTF közvetlenül; SCN KitchenDraw Bridge segítségével.
 
-**Közvetlen SCN-betöltés feltétele:** a telepítés önmagában még nem telepíti a KitchenDraw-hoz tartozó bővítményt. Ehhez a telepített KitchenDraw és a saját `KD.SDK2.dll` szükséges; a Start menüben külön **KitchenDraw Bridge – beállítás** parancsikon segít a bővítmény helyi lefordításában, majd azt KitchenDraw Plugin Managerében engedélyezni kell. Ezt a fordítási/kapcsolati műveletet még valódi KitchenDraw környezetben tesztelni kell.
+**Fontos:** a jelenlegi SCN-megnyitás nem önálló SCN-parser. A KitchenDraw saját katalógusait és SDK2-bővítményét igényli. A csatolt eredeti SCN valódi geometriájának importját ezen a gépen KitchenDraw nélkül nem tudtuk hitelesen kipróbálni. A telepítő önmagában nem teszi elérhetővé a KitchenDraw katalógusadatokat. A bővítmény fordítója az SCN Viewer Start menü **KitchenDraw Bridge – beállítás** parancsikonján indítható.
+
+Az adatok nem kerülnek internetes szerverre; a 3D megjelenítő offline működik. A program forrása nyilvános, nincs aláírva tanúsítvánnyal, ezért a Windows SmartScreen figyelmeztethet.
 
 ## KitchenDraw Bridge beállítása Windows 11-en – első alkalom
 
 1. Telepítsd és indítsd el a **KitchenDraw** támogatott verzióját (és a tervhez szükséges katalógusokat). A SDK2 a `KD.SDK2.dll` fájlja.
 2. A Start menüből indítsd a **KitchenDraw Bridge – beállítás** parancsikont (vagy a `Build_KitchenDraw_Bridge.bat` fájlt). A segéd keresni fogja a `KD.SDK2.dll` fájlt a szokásos helyeken, vagy bekéri a helyét. Ha sikeres a fordítás, a DLL itt lesz: `KitchenDrawBridge\KitchenDrawBridge.dll`.
 3. A KitchenDraw-ban nyisd meg a **? → Service → Plugin Manager** menüt, regisztráld a lefordított `KitchenDrawBridge.dll` fájlt, és állítsd aktívra. Alternatíva: a KitchenDraw telepítési mappájából a `SPACE.INI` `[Plugins]` szakaszában regisztrálható. A regisztráció/aktiválás után **indítsd újra a KitchenDraw-t**.
-4. A Start menüből (vagy az asztalról) indítsd az **SCN Viewert**. Forrásból futtatva a `Start_ScnViewer.bat` is használható. A böngésző megnyitja a `http://127.0.0.1:8765/` címet.
+4. A Start menüből (vagy az asztalról) indítsd az **SCN Viewert**. Forrásból futtatva a `Start_ScnViewer.bat` a régi böngészős, fejlesztői módhoz használható. A saját SCN Viewer alkalmazásablak megnyílik.
 5. A „KitchenDraw kapcsolat” panelben ellenőrizd, hogy **„KitchenDraw Bridge: kapcsolódva”** jelenik-e meg. Válaszd a **„SCN / 3D fájl megnyitása”** gombot, és nyisd meg a saját `.scn`-edet, pl. `64F080FA_4198_01.scn`.
 6. A Viewer a helyi ideiglenes mappában átadja a terv **másolatát** a KitchenDraw-nak. A KitchenDraw SDK a katalógusok alapján OBJ-t exportál, a Viewer automatikusan megjeleníti. Nincs szükség kézi OBJ-exportálásra **a telepítés után**.
 
-**A forrásfájl nem módosul.** A terv és az exportok a felhasználó gépén maradnak a `%LOCALAPPDATA%\ScnViewerBridge\queue` mappában. A helyi kiszolgáló csak `127.0.0.1:8765` címen figyel, az SCN nem töltődik fel a GitHubra vagy más internetes szerverre. A telepítőben a Three.js könyvtár helyben van, ezért a 3D nézegetéshez internet nem szükséges. Csak a nyers forrásból futtatott fejlesztői nézet használ CDN-t. A régebbi helyi feldolgozási fájlok törölhetők a Viewer és a KitchenDraw leállítása után.
+**A forrásfájl nem módosul.** A terv és az exportok a felhasználó gépén maradnak a `%LOCALAPPDATA%\ScnViewerBridge\queue` mappában. A helyi kiszolgáló csak `127.0.0.1:8765` címen figyel, az SCN nem töltődik fel a GitHubra vagy más internetes szerverre. A telepítőben a Three.js és az Electron futtatókörnyezete helyben van, ezért a 3D nézegetéshez internet nem szükséges. Csak a nyers forrásból futtatott fejlesztői nézet használ CDN-t. A régebbi helyi feldolgozási fájlok törölhetők a Viewer és a KitchenDraw leállítása után.
 
 ### Miért nem önálló SCN-parser?
 
@@ -40,7 +45,7 @@ A bővítmény **soha nem dob el nem mentett KitchenDraw-tervet**: ha egy másik
 
 - KitchenDraw fut-e? A bővítmény be van-e kapcsolva a Plugin Managerben?
 - A build során valóban a helyi KitchenDraw-hoz tartozó `KD.SDK2.dll` fájlt adtad meg?
-- A helyi Viewer `Start_ScnViewer.bat` fájlját indítottad? GitHub Pages-en nem működik a helyi SCN-átalakító.
+- A helyi Viewer `SCN Viewer.exe` alkalmazást indítottad? GitHub Pages-en nem működik a helyi SCN-átalakító.
 - Ha a build hibás, a `KitchenDrawBridge/KitchenDrawBridge.csproj` projekthez használhatsz Visual Studio + .NET Framework 4.8 fejlesztőkörnyezetet is (Release/x86). A gyári SDK binárist jogtisztasági okból nem csomagoljuk.
 - Ha az SCN export hibát jelez, ellenőrizd a hozzá tartozó katalógusokat. Alternatívaként a KitchenDraw saját **Fájl → Exportálás → 3D fájl (.OBJ)** művelete után az OBJ közvetlenül megnyitható.
 
@@ -62,7 +67,7 @@ A sarok- és élillesztés, 3D/felülnézet/elölnézet/oldalnézet, a 2-szekré
 ## Műszaki felépítés
 
 - `viewer/` – HTML/CSS/Three.js felület (nincs build lépés).
-- `Start_ScnViewer.ps1` – PowerShell 5.1 alapú, `127.0.0.1`-re korlátozott statikus kiszolgáló + HTTP API; fájlméretkorlát 50 MB, Origin/Host ellenőrzés, ideiglenes munkakönyvtár.
+- `desktop/main.cjs` + `desktop/server.cjs` – teljes értékű Electron Windows-ablak saját helyi, véletlenszerű portot használó kiszolgálóval. A régi PowerShell-indító megmaradt kizárólag fejlesztői forrásként, de a telepített alkalmazás nem használja.
 - `KitchenDrawBridge/Plugin.cs` – KitchenDraw SDK2 plugin, a KitchenDraw felületének szálán dolgozik (WinForms Timer, nem háttérszálon SDK-hívás).
 - `Build_KitchenDraw_Bridge.*` – fordítóindító a **helyileg telepített** SDK-hoz.
 - `tests/` – statikus UI- és mintageometria-tesztek.
@@ -73,7 +78,7 @@ Az eredeti, a beszélgetésben csatolt SCN **nincs a GitHub-projektbe vagy a ter
 
 - A JS fájl szintaxisa Node.js-szel ellenőrizhető: `node --check viewer/main.js`.
 - A UI elem-/vezérlés-azonosítók és a 600×400×18 példalap teszttel ellenőrizhetők: `python tests/test_interface.py` és `python tests/test_geometry.py` (utóbbihoz `trimesh` kell).
-- **Nem igazolt:** a KitchenDraw Bridge DLL helyi fordítása, valódi KitchenDraw alatti plugin-betöltés, a csatolt SCN teljes geometriájának exportja és az ebből kapott OBJ dimenzióinak hitelesítése. Ezekhez a felhasználó Windows gépe és a KitchenDraw SDK/katalógusai szükségesek. Az itt átadott v1.0 fejlesztői/tesztkiadás, nem gyártásra hitelesített CAD-konverter.
+- **Nem igazolt:** a KitchenDraw Bridge DLL helyi fordítása, valódi KitchenDraw alatti plugin-betöltés, a csatolt SCN teljes geometriájának exportja és az ebből kapott OBJ dimenzióinak hitelesítése. Ezekhez a felhasználó Windows gépe és a KitchenDraw SDK/katalógusai szükségesek. Az itt átadott v1.2 asztali kiadás, nem gyártásra hitelesített CAD-konverter.
 
 ## Hivatalos SDK2 hivatkozások
 

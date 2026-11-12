@@ -1,16 +1,44 @@
 {
-  "name": "scn-viewer-installer",
+  "name": "scn-viewer-desktop",
+  "productName": "SCN Viewer",
   "private": true,
-  "version": "1.1.0",
-  "description": "Offline Three.js bundling and Windows installer packaging for SCN Viewer",
+  "version": "1.2.0",
+  "main": "desktop/main.cjs",
+  "description": "SCN Viewer - native Windows desktop window with three-dimensional measurement",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py"
+    "desktop": "npm run build && electron .",
+    "package:win": "electron-builder --win --dir --x64",
+    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py"
   },
   "dependencies": {
     "three": "0.170.0"
   },
   "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
     "esbuild": "0.25.12"
+  },
+  "build": {
+    "appId": "hu.kissjaniapp.scnviewer",
+    "productName": "SCN Viewer",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": { "output": "packed" },
+    "files": [
+      "desktop/**/*",
+      "dist/viewer/**/*",
+      "installer/SCNViewer.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "KitchenDrawBridge", "to": "KitchenDrawBridge" },
+      { "from": "Build_KitchenDraw_Bridge.ps1", "to": "Build_KitchenDraw_Bridge.ps1" },
+      { "from": "Build_KitchenDraw_Bridge.bat", "to": "Build_KitchenDraw_Bridge.bat" }
+    ],
+    "win": {
+      "icon": "installer/SCNViewer.ico",
+      "signAndEditExecutable": false
+    }
   }
 }
