@@ -2,14 +2,14 @@
   "name": "scn-viewer-desktop",
   "productName": "SCN Viewer",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "main": "desktop/main.cjs",
-  "description": "Native standalone Windows SCN Viewer with independent binary parser and mm measurement",
+  "description": "Native standalone SCN viewer with structural panel rendering and stable Z-up CAD controls",
   "scripts": {
     "build": "node tools/build.mjs",
     "desktop": "npm run build && electron .",
     "package:win": "electron-builder --win --dir --x64",
-    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py && node tests/test_scn_parser.mjs"
+    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py && node tests/test_scn_parser.mjs && node tests/test_scn_layout.mjs && node tests/test_navigation.mjs"
   },
   "dependencies": {
     "three": "0.170.0"

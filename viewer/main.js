@@ -1,4 +1,5 @@
 import { decodeScn } from './scn-parser.js';
+import { classifyScnRecord, discoverScnRegions } from './scn-layout.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -15,30 +16,41 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPr
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.4;
+renderer.toneMappingExposure = 1.08;
 viewport.prepend(renderer.domElement);
 renderer.domElement.style.width = '100%';
 renderer.domElement.style.height = '100%';
 renderer.domElement.style.touchAction = 'none';
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = .12;
-controls.rotateSpeed = 1.35;
-controls.zoomSpeed = 1.3;
-controls.panSpeed = 1.2;
-controls.screenSpacePanning = true;
-// Left mouse belongs to selection / point measurement, not navigation.
-controls.mouseButtons = {LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE};
+// OrbitControls caches a quaternion from camera.up *at construction time*.
+// v1.3 changed camera.up after construction (Y -> Z): this made the CAD
+// camera rotate around the wrong axis and invert close to the poles.
+camera.up.set(0, 0, 1);
+let controls;
+function rebuildControls() {
+ if (controls) controls.dispose();
+ controls = new OrbitControls(camera, renderer.domElement);
+ controls.enableDamping = false; // direct, predictable Tinkercad-like movement
+ controls.rotateSpeed = .65;
+ controls.zoomSpeed = 1.1;
+ controls.panSpeed = .8;
+ controls.zoomToCursor = true;
+ controls.screenSpacePanning = true;
+ controls.minPolarAngle = .008;
+ controls.maxPolarAngle = Math.PI - .008;
+ controls.mouseButtons = {LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE};
+ controls.addEventListener('change', invalidate);
+}
+rebuildControls();
 renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
 camera.position.set(1500, -2300, 1600);
 camera.up.set(0, 0, 1);
 controls.target.set(0, 0, 0);
 controls.update();
-scene.add(new THREE.HemisphereLight(0xddeeff, 0x5b7084, 2.2));
-const sun = new THREE.DirectionalLight(0xffffff, 3.2);
+scene.add(new THREE.HemisphereLight(0xf5f7f5, 0x667480, 1.4));
+const sun = new THREE.DirectionalLight(0xfff6e9, 2.0);
 sun.position.set(350, -450, 900);
 scene.add(sun);
-const fill = new THREE.DirectionalLight(0xa2cfff, 1.1);
+const fill = new THREE.DirectionalLight(0xc6defb, .7);
 fill.position.set(-300, 250, 500);
 scene.add(fill);
 
@@ -60,6 +72,10 @@ let mmPerUnit = 1;
 let upAxis = 'Z';
 let activePointer = null;
 let toastHandle = null;
+let scnLayout = null;
+let scnRecordMeshes = new Map();
+let scnRegionGroups = new Map();
+let scnMaterials = null;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tempVec = new THREE.Vector3();
@@ -77,7 +93,12 @@ function formatPoint(point) { return point ? [point.x, point.y, point.z].map(v =
 function getModelBounds() {
  if (!model) return null;
  model.updateWorldMatrix(true, true);
- const box = new THREE.Box3().setFromObject(model);
+ const box = new THREE.Box3();
+ if(model.userData.nativeScn) {
+  for(const mesh of scnRecordMeshes.values()) {
+   if(mesh.visible && mesh.userData.scnRole==='panel') box.expandByObject(mesh);
+  }
+ } else box.setFromObject(model);
  return box.isEmpty() ? null : box;
 }
 function updateStats() {
@@ -88,7 +109,13 @@ function updateStats() {
 }
 function setAxis(axis) {
  upAxis = axis;
- camera.up.set(...(axis === 'Z' ? [0, 0, 1] : [0, 1, 0]));
+ const wanted = axis === 'Z' ? new THREE.Vector3(0,0,1) : new THREE.Vector3(0,1,0);
+ if (!camera.up.equals(wanted)) {
+  const oldTarget = controls.target.clone();
+  camera.up.copy(wanted);
+  rebuildControls();
+  controls.target.copy(oldTarget);
+ }
  grid.rotation.set(0, 0, 0);
  grid.rotation.x = axis === 'Z' ? Math.PI / 2 : 0;
  const center = modelBox ? modelBox.getCenter(new THREE.Vector3()) : new THREE.Vector3();
@@ -136,14 +163,12 @@ function setView(type) {
  const size = modelBox ? modelBox.getSize(new THREE.Vector3()).length() : 1000;
  const dist = Math.max(size * 1.25, 10);
  const vec = upAxis === 'Z' ? {
-  iso: [1, -1.45, .95], top: [0, 0, 1], front: [0, -1, 0], right: [1, 0, 0]
+  iso: [1, -1.45, .95], top: [0, .0001, 1], front: [0, -1, .0001], right: [1, 0, .0001]
  } : {
-  iso: [1, .95, 1.45], top: [0, 1, 0], front: [0, 0, 1], right: [1, 0, 0]
+  iso: [1, .95, 1.45], top: [0, 1, .0001], front: [0, .0001, 1], right: [1, .0001, 0]
  };
  const dir = new THREE.Vector3(...vec[type]).normalize();
  camera.position.copy(target).addScaledVector(dir, dist);
- camera.up.set(...(upAxis === 'Z' ? [0, 0, 1] : [0, 1, 0]));
- if (type === 'top') camera.up.set(...(upAxis === 'Z' ? [0, 1, 0] : [0, 0, -1]));
  controls.target.copy(target);
  controls.update();
  for (const button of document.querySelectorAll('[data-view]')) button.classList.toggle('selected', button.dataset.view === type);
@@ -159,7 +184,7 @@ function toggleEdges(enabled) {
  clearEdges();
  if (!enabled || !model) return;
  model.traverse(obj => {
-  if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
+  if (!obj.isMesh || !obj.geometry?.attributes?.position || (model.userData.nativeScn && obj.userData.scnRole !== 'panel')) return;
   const g = new THREE.EdgesGeometry(obj.geometry, 30);
   const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x132b42, transparent: true, opacity: .65 }));
   obj.add(lines);
@@ -178,6 +203,8 @@ function disposeModel() {
    if (obj.material) (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach(m => m.dispose());
   });
  }
+ if(scnMaterials?.wood) scnMaterials.wood.dispose();
+ scnMaterials=null;
  model = null;
  modelBox = null;
 }
@@ -187,6 +214,12 @@ function prepareModel(group, name) {
  partSizeCache = new WeakMap();
  meshCountCache = new WeakMap();
  model = group;
+ const native = model.userData.scnState;
+ scnLayout = native ? {data:native.data,layout:native.layout} : null;
+ scnRecordMeshes = native?.meshes || new Map();
+ scnRegionGroups = native?.groups || new Map();
+ scnMaterials = native?.palette || null;
+ if(!native) $('scnExplorer').hidden=true;
  originName = name;
  model.traverse(obj => {
   if (!obj.isMesh) return;
@@ -210,79 +243,199 @@ function prepareModel(group, name) {
  notify(`Modell megnyitva: ${name} (${meshes.length} objektum)`);
 }
 
-// Native binary KitchenDraw SCN import: no KitchenDraw, SDK or bridge.
-// The currently decoded variant stores real sizes and placements in mm,
-// but catalog-defined details are reconstructed as bounding solids.
-function scnColor(entry) {
- if (/^CUBE$/i.test(entry.name)) return 0x78abc1;
- if (/PANEL/i.test(entry.name)) return 0xc59b70;
- if (/^CYL/i.test(entry.name)) return 0xb0c6c7;
- if (/PULT|ND_|KÉZMOSÓ|átadó/i.test(entry.name)) return 0x789bb2;
- return 0x90aaa5;
+// Independent SCN reconstruction. We draw real thin panel records as separate
+// board-sized meshes. The catalog envelopes are never mistaken for solids.
+function createWoodTexture() {
+ const canvas = document.createElement('canvas');
+ canvas.width = 192; canvas.height = 512;
+ const ctx = canvas.getContext('2d');
+ const image = ctx.createImageData(canvas.width, canvas.height);
+ let seed = 94331;
+ const rand = () => {seed = (1664525*seed+1013904223)>>>0;return seed/0x100000000;};
+ const streaks = Array.from({length:canvas.width},(_,x)=>
+   Math.sin(x*.09) * 7 + Math.sin(x*.44)*2 + (rand()-.5)*8);
+ for(let y=0;y<canvas.height;y++) for(let x=0;x<canvas.width;x++) {
+  const i=(y*canvas.width+x)*4;
+  const grain = streaks[x] + Math.sin(y*.018+x*.045)*2 + (rand()-.5)*2;
+  image.data[i]=Math.max(0,Math.min(255,216+grain));
+  image.data[i+1]=Math.max(0,Math.min(255,182+grain*.9));
+  image.data[i+2]=Math.max(0,Math.min(255,142+grain*.7));
+  image.data[i+3]=255;
+ }
+ ctx.putImageData(image,0,0);
+ const texture = new THREE.CanvasTexture(canvas);
+ texture.colorSpace=THREE.SRGBColorSpace;
+ texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
+ return texture;
 }
-function isScnCabinetAnchor(entry) {
- return /PULT|ND_1300|UNOX|KÉZMOSÓ|átadó/i.test(entry.name);
+function makeScnMaterials(finish) {
+ const wood = createWoodTexture();
+ const faceColors = {
+  oak: 0xffffff,
+  white: 0xf0f2f0,
+  graphite: 0x667783,
+ };
+ const color = faceColors[finish] || faceColors.oak;
+ const painted = finish !== 'oak';
+ const face = new THREE.MeshStandardMaterial({color, map:painted?null:wood, roughness:painted?.76:.82, metalness:0, side:THREE.DoubleSide});
+ const side = new THREE.MeshStandardMaterial({color:finish==='oak'?0xb68b61:finish==='white'?0xd4d8d7:0x40515c,roughness:.82,side:THREE.DoubleSide});
+ const metal = new THREE.MeshStandardMaterial({color:0xa9b6bd,roughness:.34,metalness:.55,side:THREE.DoubleSide});
+ const reference = new THREE.MeshBasicMaterial({color:0x8ec7d8,transparent:true,opacity:.075,depthWrite:false,side:THREE.DoubleSide});
+ const edge = new THREE.LineBasicMaterial({color:0x82bdcb,transparent:true,opacity:.42,depthTest:true,depthWrite:false});
+ return {wood, face,side,metal,reference,edge,
+   board:[side,side,face,face,face,face]};
+}
+function applyScnFinish() {
+ if (!model?.userData.nativeScn) return;
+ const old = scnMaterials;
+ scnMaterials = makeScnMaterials($('finishStyle').value);
+ for(const mesh of scnRecordMeshes.values()) {
+  const role = mesh.userData.scnRole;
+  mesh.material = role==='panel'?scnMaterials.board:
+    role==='fitting'?scnMaterials.metal:scnMaterials.reference;
+ }
+ if(old) {
+  for(const item of [old.face,old.side,old.metal,old.reference,old.edge,old.wood]) item?.dispose();
+ }
+ invalidate();
 }
 function buildScnModel(data) {
- const group = new THREE.Group();
- group.name = 'SCN jelenet — saját bináris dekóder';
- group.userData.nativeScn = true;
- const cube = new THREE.BoxGeometry(1, 1, 1);
- const cylinderX = new THREE.CylinderGeometry(.5, .5, 1, 16);
- cylinderX.rotateZ(Math.PI / 2);
- const cylinderZ = new THREE.CylinderGeometry(.5, .5, 1, 16);
- cylinderZ.rotateX(Math.PI / 2);
- const materialCache = new Map();
- const objects = [];
- for (const record of data.entries) {
-  const color = scnColor(record);
-  let material = materialCache.get(color);
-  if (!material) {
-   material = new THREE.MeshStandardMaterial({color, roughness:.82, metalness:.02, side:THREE.DoubleSide});
-   materialCache.set(color, material);
-  }
-  const geometry = record.type === 'cylinderX' ? cylinderX : record.type === 'cylinderZ' ? cylinderZ : cube;
-  const mesh = new THREE.Mesh(geometry, material);
+ const root = new THREE.Group();
+ root.name = 'SCN – önálló mérethelyes jelenet';
+ root.userData.nativeScn=true;
+ const layout = discoverScnRegions(data.entries);
+ const groups = new Map();
+ const meshes = new Map();
+ for(const region of layout.regions) {
+  const group=new THREE.Group();
+  group.name=region.name + ' (térbeli csoport, becslés)';
+  group.userData.scnRegionId=region.id;
+  group.userData.scnRegion=region;
+  group.userData.cabinetName=group.name;
+  root.add(group);
+  groups.set(region.id,group);
+ }
+ const detached=new THREE.Group();
+ detached.name='Különálló SCN objektumok';
+ detached.userData.scnRegionId=0;
+ root.add(detached);
+ groups.set(0,detached);
+ const unitBox = new THREE.BoxGeometry(1,1,1);
+ const cylinderX = new THREE.CylinderGeometry(.5,.5,1,12);
+ cylinderX.rotateZ(Math.PI/2);
+ const cylinderZ = new THREE.CylinderGeometry(.5,.5,1,12);
+ cylinderZ.rotateX(Math.PI/2);
+ const palette=makeScnMaterials($('finishStyle').value);
+ for(const record of data.entries) {
+  const role=classifyScnRecord(record);
+  if(role==='invalid') continue;
+  const geometry=record.type==='cylinderX'?cylinderX:record.type==='cylinderZ'?cylinderZ:unitBox;
+  const mesh = new THREE.Mesh(geometry,role==='panel'?palette.board:
+    role==='fitting'?palette.metal:palette.reference);
+  mesh.name=`${record.name} #${record.id}`;
   mesh.scale.set(...record.size);
-  mesh.position.set(...record.position.map((v, i) => v + record.size[i] / 2));
-  mesh.name = `${record.name} #${record.id}`;
-  mesh.userData.partName = record.name + ` [SCN #${record.id}]`;
-  mesh.userData.scnRecord = record;
-  mesh.userData.scnApproximate = true;
-  objects.push({mesh, record});
- }
- // Associate primitives with the best fitting named furniture bounding boxes.
- // This is a spatial aid, NOT a claim that KitchenDraw's proprietary component
- // hierarchy or exact CNC panel tree has been recovered.
- const anchors = objects.filter(({record}) => isScnCabinetAnchor(record));
- const groups = anchors.map(({record}) => {
-  const cabinet = new THREE.Group();
-  cabinet.name = record.name + ` (SCN csoport — becslés)`;
-  cabinet.userData.cabinetName = cabinet.name;
-  cabinet.userData.scnApproximate = true;
-  group.add(cabinet);
-  return {record,cabinet};
- });
- for (const {mesh,record} of objects) {
-  const ownAnchor = groups.find(g => g.record === record);
-  if (ownAnchor) { ownAnchor.cabinet.add(mesh); continue; }
-  if (record.name !== 'CUBE' && !/^CYL|^PLAN1$|PANEL/i.test(record.name)) {
-   group.add(mesh); continue;
+  mesh.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
+  mesh.userData.partName = record.name + ` (SCN #${record.id})`;
+  mesh.userData.scnRole=role;
+  mesh.userData.scnRecord=record;
+  mesh.userData.scnApproximate=role!=='panel';
+  const regionId=layout.idToRegion.get(record.id) ?? 0;
+  mesh.userData.scnRegionId=regionId;
+  groups.get(regionId)?.add(mesh);
+  if(role==='reference') {
+   // Named catalog objects get a pale outline instead of an opaque rectangle.
+   // This outline does not claim to reproduce any KitchenDraw geometry.
+   const outline = new THREE.LineSegments(new THREE.EdgesGeometry(unitBox),palette.edge);
+   outline.userData.scnOutline=true;
+   mesh.add(outline);
   }
-  const center = record.position.map((x,i) => x + record.size[i]/2);
-  let best = null, score = Infinity;
-  for (const g of groups) {
-   const p=g.record.position, d=g.record.size;
-   // A surrounding furniture object must encompass the panel center with
-   // a small tolerance; never attach distant elements by mere proximity.
-   const delta = center.map((v,i) => Math.max(p[i]-180-v, 0, v-(p[i]+d[i]+180)));
-   if (delta.some(v => v > 0)) continue;
-   const dist = Math.hypot(...center.map((v,i) => (v-(p[i]+d[i]/2))/(d[i]+1)));
-   if (dist<score) {score=dist; best=g;}
-  }
-  (best ? best.cabinet : group).add(mesh);
+  meshes.set(record.id,mesh);
  }
- return group;
+ root.userData.scnState={data,layout,groups,meshes,palette};
+ return root;
+}
+function setScnVisible() {
+ if (!model?.userData.nativeScn) return;
+ const chosen=$('scnArea').value;
+ const area = chosen==='all' ? null : Number(chosen);
+ let panels=0, references=0;
+ for(const mesh of scnRecordMeshes.values()) {
+  const role=mesh.userData.scnRole;
+  const inArea=area===null || mesh.userData.scnRegionId===area;
+  const isVisible=inArea && (role==='panel' ||
+    (role==='fitting' && $('showFittings').checked) ||
+    (role==='reference' && $('showCatalogShapes').checked));
+  // Generic CUBE proxy volumes deliberately stay hidden; even enabling
+  // outlines must not cover assembled panel geometry with massive boxes.
+  mesh.visible=isVisible;
+  if(isVisible && role==='panel') panels++;
+  if(isVisible && role==='reference') references++;
+ }
+ if(selectedMesh && !selectedMesh.visible) clearSelection();
+ $('visibleScnCount').textContent=`${panels} különálló lap · ${references} referenciakörvonal`;
+ boundsCache=new WeakMap();
+ partSizeCache=new WeakMap();
+ fitView();
+ updateScnItemList();
+ invalidate();
+}
+function updateScnItemList() {
+ const list=$('scnItemList');
+ list.replaceChildren();
+ if(!model?.userData.nativeScn) return;
+ const area=$('scnArea').value;
+ const entries=scnLayout.data.entries.filter(record=>
+  classifyScnRecord(record)==='reference' &&
+  (area==='all'||String(scnLayout.layout.idToRegion.get(record.id)??0)===area));
+ for(const record of entries.slice(0,50)) {
+  const btn=document.createElement('button');
+  btn.className='scn-item';
+  const label=document.createElement('span');label.textContent=record.name;
+  const size=document.createElement('small');size.textContent=record.size.join(' × ')+' mm';
+  btn.append(label,size);
+  btn.title='Katalógushivatkozás – nem feltétlenül alkatrész vagy önálló szekrény';
+  btn.addEventListener('click',()=>{
+   $('showCatalogShapes').checked=true;
+   const areaId=scnLayout.layout.idToRegion.get(record.id)??0;
+   if($('scnArea').value!=='all' && String(areaId)!==$('scnArea').value) $('scnArea').value='all';
+   setScnVisible();
+   const target=scnRecordMeshes.get(record.id);
+   if(!target) return;
+   setSelection(target);
+   focusOnObject(target);
+  });
+  list.append(btn);
+ }
+ if(entries.length>50) {
+  const note=document.createElement('p'); note.className='hint'; note.textContent=`További ${entries.length-50} bejegyzés nem látható a listában.`;list.append(note);
+ }
+}
+function focusOnObject(object) {
+ const box = new THREE.Box3().setFromObject(object);
+ if(box.isEmpty()) return;
+ const center=box.getCenter(new THREE.Vector3());
+ const size=box.getSize(new THREE.Vector3());
+ const radius=Math.max(size.length()*.5,50);
+ controls.target.copy(center);
+ const dir=camera.position.clone().sub(controls.target).normalize();
+ if(dir.lengthSq()<.1) dir.set(1,-1,1).normalize();
+ camera.position.copy(center).addScaledVector(dir,radius*3.1);
+ camera.near=Math.max(radius/2000,.01);
+ camera.far=Math.max(radius*2000,10000);
+ camera.updateProjectionMatrix();
+ controls.update();invalidate();
+}
+function updateScnExplorer() {
+ if(!scnLayout) return;
+ $('scnExplorer').hidden=false;
+ const chooser=$('scnArea');
+ chooser.replaceChildren();
+ for(const [value,label] of [['all','Összes terület'],...scnLayout.layout.regions.map(z=>[String(z.id),z.label])]) {
+  const option=document.createElement('option');option.value=value;option.textContent=label;chooser.append(option);
+ }
+ const best=scnLayout.layout.regions.find(x=>x.panelCount>=3);
+ chooser.value=best?String(best.id):'all';
+ setScnVisible();
 }
 async function openScn(file) {
  try {
@@ -295,9 +448,10 @@ async function openScn(file) {
   mmPerUnit = 1;
   setAxis('Z');
   prepareModel(sceneGroup, file.name);
-  $('fileHint').textContent = `${decoded.entries.length} valós SCN-objektum és mm-es koordinátája beolvasva. A katalógusfüggő részleteket a Viewer befoglaló testekkel helyettesíti; az ezek felületén végzett mérés közelítő.`;
-  $('scnInfo').textContent = `${decoded.entries.length} elem · ${decoded.recognized} ismert rekord · ${decoded.unsupported} kihagyott sablon/nem támogatott rekord. Az objektumméretek és az elhelyezés közvetlenül az SCN-ből származnak, nem a bemutatómodellből.`;
-  notify(`Valódi SCN megnyitva: ${decoded.entries.length} objektum (egyszerűsített 3D).`);
+  updateScnExplorer();
+  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. A különálló lapok előtérben; a katalógusobjektumok csak opcionális körvonalak. A pontos gyártói formák hiányozhatnak.`;
+  $('scnInfo').textContent = `${decoded.entries.length} rekord · ${scnLayout.layout.regions.length} elkülönülő szerkezeti terület. A lapok méretei az SCN-ből származnak; csoportosításuk térbeli becslés.`;
+  notify(`SCN megnyitva: ${decoded.entries.length} rekord · lapokra bontott nézet.`);
  } catch (error) {
   console.error(error);
   $('fileHint').textContent = 'Nem támogatott SCN változat vagy sérült fájl: ' + (error?.message || String(error));
@@ -333,7 +487,7 @@ async function openFiles(files) {
   $('upAxis').value = ['glb', 'gltf'].includes(extension) ? 'Y' : 'Z';
   setAxis($('upAxis').value);
   prepareModel(result, file.name);
-  showManifest(null);
+  $('manifestSection').hidden=true;
  } catch(error) { console.error(error); notify('Nem sikerült megnyitni: ' + (error?.message || String(error))); }
 }
 
@@ -371,7 +525,7 @@ function findCabinetGroup(mesh) {
  const hierarchy = [];
  for (let p = mesh.parent; p && p !== model; p = p.parent) hierarchy.push(p);
  // A CAD scene with explicit named group(s) takes precedence.
- const named = hierarchy.find(p => p.userData?.cabinetId || p.userData?.cabinet || isCabinetName(p.name));
+ const named = hierarchy.find(p => p.userData?.scnRegionId || p.userData?.cabinetId || p.userData?.cabinet || isCabinetName(p.name));
  if (named) return { object: named, inferred: true };
  // Separate root-level branches that contain multiple meshes usually mean a cabinet.
  const branch = hierarchy.at(-1);
@@ -383,19 +537,28 @@ function findCabinetGroup(mesh) {
 function selectionDetails() {
  if (!selectedMesh || !model) return null;
  const mode = $('selectionType').value;
- if (mode === 'part') {
+ if (mode === 'part' || (model.userData?.nativeScn && selectedMesh.userData.scnRole === 'reference')) {
   const size = getLocalPartSize(selectedMesh);
   const name = selectedMesh.userData?.partName || selectedMesh.name || `Alkatrész ${meshNumbers.get(selectedMesh) || ''}`;
+  const kind = model.userData?.nativeScn ?
+    (selectedMesh.userData.scnRole === 'panel' ? 'Különálló szerkezeti lap' : 'Katalógusobjektum (befoglaló)') : 'Alkatrész';
   return { object: selectedMesh, box: getSelectionBounds(selectedMesh), name,
-    size, kind: 'Alkatrész',
-    notice: model.userData?.nativeScn ? 'Méret közvetlenül az SCN objektumrekordjából (mm). A kirajzolt alakzat a befoglaló forma közelítése.' : 'Az alkatrész saját geometriájának méretei. Több alkatrész összevont 3D hálóját a Viewer nem tudja különválasztani.' };
+    size, kind,
+    notice: model.userData?.nativeScn ? (selectedMesh.userData.scnRole === 'panel' ?
+     'A méret a fájlban tárolt különálló SCN lapból származik (mm). A pontos elforgatás nem mindig ismert.' :
+     'Ez a méret a KitchenDraw-katalógusra hivatkozó objektum befoglalója, NEM bizonyított alkatrészméret vagy eredeti 3D test.') :
+     'Az alkatrész saját geometriájának méretei. Több alkatrész összevont 3D hálóját a Viewer nem tudja különválasztani.' };
  }
  const { object, inferred } = findCabinetGroup(selectedMesh);
- const box = getSelectionBounds(object);
+ let box = getSelectionBounds(object);
+ if(model.userData.nativeScn && object.userData?.scnRegion) {
+  const region=object.userData.scnRegion;
+  box = new THREE.Box3(new THREE.Vector3(...region.min), new THREE.Vector3(...region.max));
+ }
  const name = inferred ? (object.userData?.cabinetName || object.name || 'SCN objektum') : 'Teljes betöltött modell';
- return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn && object.isMesh) ? 'SCN objektum' : 'Szekrény',
+ return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn) ? (object.isMesh ? 'SCN objektum' : 'Bútoregyüttes (becsült)') : 'Szekrény',
    notice: inferred
-     ? (model.userData?.nativeScn ? 'SCN-adatokból számolt befoglaló méret. Az eredeti gyártói 3D forma és szekrénycsoport határa nem minden esetben ismert.' : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
+     ? (model.userData?.nativeScn ? 'A látható lapok térbeli csoportjának külső mérete; ez nem bizonyított egyedi KitchenDraw szekrényhatár.' : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
      : 'A fájl nem tartalmaz felismerhető szekrénycsoportokat: ezért a teljes modell külmérete látható, nem egy külön szekrényé.' };
 }
 function clearSelection() {
@@ -459,7 +622,9 @@ function pickHit(event) {
  mouse.set(px / rect.width * 2 - 1, -(py / rect.height) * 2 + 1);
  raycaster.setFromCamera(mouse, camera);
  // Geometry only, not the grid, axes, measurement markers or selection outline.
- return raycaster.intersectObject(model, true).find(h => h.object.isMesh) || null;
+ const valid = raycaster.intersectObject(model, true).filter(h => h.object.isMesh && h.object.visible &&
+   (!model.userData.nativeScn || h.object.userData.scnRole !== 'proxy'));
+ return model.userData.nativeScn ? (valid.find(h=>h.object.userData.scnRole==='panel') || valid[0] || null) : (valid[0] || null);
 }
 function pickPoint(event) {
  const hit = pickHit(event);
@@ -569,6 +734,10 @@ $('mmPerUnit').addEventListener('input', e => {
 $('upAxis').addEventListener('change', e => { setAxis(e.target.value); updateGrid(); updateSelectionStats(); });
 $('showGrid').addEventListener('change', updateGrid);
 $('showEdges').addEventListener('change', e => toggleEdges(e.target.checked));
+$('scnArea').addEventListener('change', setScnVisible);
+$('showCatalogShapes').addEventListener('change', setScnVisible);
+$('showFittings').addEventListener('change', setScnVisible);
+$('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
  if (snapPoints.length !== 2) return notify('Előbb jelölj ki két pontot!');
  const [a,b] = snapPoints;
@@ -594,7 +763,6 @@ function invalidate() {
   renderer.render(scene, camera);
  });
 }
-controls.addEventListener('change', invalidate);
 new ResizeObserver(() => { resize(); invalidate(); }).observe(viewport);
 resize();
 invalidate();

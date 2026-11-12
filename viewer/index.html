@@ -34,7 +34,7 @@
    <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
    <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
    <label class="check"><input type="checkbox" id="showGrid" checked/> Segédrács</label>
-   <label class="check"><input type="checkbox" id="showEdges"/> Élek kiemelése</label>
+   <label class="check"><input type="checkbox" id="showEdges" checked/> Lapélek kiemelése</label>
   </section>
   <section>
    <div class="section-title">Nézetek</div>
@@ -44,6 +44,17 @@
     <button data-view="front">Elölnézet</button>
     <button data-view="right">Oldalnézet</button>
    </div>
+  </section>
+  <section id="scnExplorer" hidden>
+   <div class="section-title">SCN szerkezet és megjelenés</div>
+   <div class="form-stack"><label for="scnArea">Melyik bútoregyüttest nézed?</label><select id="scnArea"><option value="all">Összes terület</option></select></div>
+   <p id="visibleScnCount" class="stat-pill">–</p>
+   <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
+   <label class="check"><input type="checkbox" id="showCatalogShapes"/> Katalógusobjektumok körvonalai</label>
+   <label class="check"><input type="checkbox" id="showFittings"/> Kisebb szerelvények megjelenítése</label>
+   <p class="hint">A lapok különálló, mérethelyes SCN-rekordok. A bútoregyüttesek térbeli becslések, nem igazolt KitchenDraw szekrényazonosítók. A választható színek saját megjelenítési stílusok.</p>
+   <div class="section-title inner-title">Felismert katalógusobjektumok</div>
+   <div id="scnItemList" class="scn-item-list" aria-label="SCN objektumok listája"></div>
   </section>
   <section class="selection-section">
    <div class="section-title">Szekrény / alkatrész kijelölése</div>
@@ -67,7 +78,7 @@
   </section>
   <section>
    <div class="section-title">Natív SCN-beolvasó</div>
-   <p class="hint">KitchenDraw nem szükséges. A tárolt objektumok méreteit és pozícióit milliméterben olvassuk. Egyes gyártói 3D részletek, anyagok és elforgatások nem szerepelnek teljes geometriaként az SCN-ben; ezek helyettesítő befoglaló testek.</p>
+   <p class="hint">KitchenDraw nem szükséges. A valódi mérettel tárolt dekorlapokat külön jelenítjük meg. A gyártói katalógusok részleteit nem találjuk ki; a nagy befoglaló téglatestek alapból rejtve maradnak.</p>
    <div id="scnInfo" class="hint" aria-live="polite">Válassz egy .scn fájlt a megnyitáshoz.</div>
   </section>
   <section id="manifestSection" hidden>
@@ -78,8 +89,8 @@
  </aside>
  <main class="viewport-wrapper">
   <div id="viewport" aria-label="Forgatható 3D nézet">
-   <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
-   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN közvetlen betöltés támogatott; a geometria katalógusfüggő részei egyszerűsítettek.</p></div>
+   <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div><div class="orbit-help">Jobb gomb: körbeforgatás <span>·</span> Görgő: zoom <span>·</span> Görgő lenyomva: mozgatás</div>
+   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN közvetlen betöltés támogatott; a ténylegesen tárolt lapok külön jelennek meg.</p></div>
    <div id="toast" role="status" aria-live="polite"></div>
   </div>
   <footer><span>Bal: kijelölés / mérés · Jobb: 3D forgatás · Benyomott görgő: mozgatás · Görgő: zoom</span><span id="modelStats">Nincs modell</span></footer>
