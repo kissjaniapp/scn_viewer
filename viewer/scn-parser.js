@@ -2,19 +2,22 @@
  * KitchenDraw .SCN binary scene reader (independent, no KitchenDraw runtime).
  *
  * Verified against 64F080FA_4198_01.scn: 463 records carry explicit size,
- * position and 'mm' unit markers.  Each relevant object record contains:
+ * position, rotation angle and 'mm' unit markers.  Each relevant object record contains:
  *  +0:  @FORMES or @DK02 catalog ID; +16: CP1250 object description
  *  +74/80/86: uint16 presence marker (=1), then uint16 X/Y/Z dimensions
  *  +106/112/118: uint16 marker (=1), then int16 X/Y/Z positions
+ *  +164: float64 XY rotation in radians (around the original local origin)
  *  +256: 'mm' (unit marker)
  * The high word of each 32-bit parameter is NOT a coordinate.  In particular
  * Z uses a 0x0009 high word on the tested KitchenDraw scene.
  *
  * LIMITATION: Not a complete proprietary format decoder. Some object entries
  * reference catalog shapes that aren't embedded as polygons in the .SCN.
- * Their *stored dimensions and placements* can be reconstructed as bounding
- * cuboids/cylinders, but not the catalog-provided details/textures/rotations.
+ * Their *stored dimensions, placements and Z-axis rotation* can be applied
+ * to schematic cuboids/cylinders, but not the missing catalog meshes/textures.
  */
+import { scnWorldBounds } from './scn-transform.js';
+
 const decoder = new TextDecoder('windows-1250');
 const patterns = [
   [64, 70, 79, 82, 77, 69, 83], // @FORMES
@@ -61,12 +64,18 @@ export function decodeScn(buffer) {
       continue;
     }
     const name = stringAt(bytes, i + 16, i + 48) || `${catalog} objektum`;
+    const rotationRad = view.getFloat64(i + 164, true);
+    if (!Number.isFinite(rotationRad) || Math.abs(rotationRad) > 200 * Math.PI) {
+      unsupported++;
+      continue;
+    }
     entries.push({
       id: entries.length + 1,
       catalog,
       name,
       size: dimensions,
       position,
+      rotationRad,
       type: /^CYL H$/i.test(name) ? 'cylinderX' : /^CYL V$/i.test(name) ? 'cylinderZ' : 'box',
       offset: i,
     });
@@ -76,9 +85,12 @@ export function decodeScn(buffer) {
     throw new Error('Nem találtam dekódolható 3D objektumot ebben az SCN változatban. Nem jelenítek meg kitalált geometriát.');
   }
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-  for (const e of entries) for (let a = 0; a < 3; a++) {
-    min[a] = Math.min(min[a], e.position[a]);
-    max[a] = Math.max(max[a], e.position[a] + e.size[a]);
+  for (const e of entries) {
+    const bbox = scnWorldBounds(e);
+    for (let a = 0; a < 3; a++) {
+      min[a] = Math.min(min[a], bbox.min[a]);
+      max[a] = Math.max(max[a], bbox.max[a]);
+    }
   }
   return {
     entries,
@@ -86,6 +98,6 @@ export function decodeScn(buffer) {
     unsupported,
     boundsMm: {min, max, size: max.map((v, i) => v - min[i])},
     fidelity: 'bounding-geometry',
-    note: 'A tárolt méretek és pozíciók valós SCN-adatok; a katalógusfüggő alakzatok egyszerűsített befoglaló testek.'
+    note: 'A tárolt méretek, pozíciók és Z-elforgatások valós SCN-adatok; a katalógusfüggő alakzatok egyszerűsített befoglaló testek.'
   };
 }

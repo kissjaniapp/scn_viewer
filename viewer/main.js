@@ -1,6 +1,7 @@
 import { decodeScn } from './scn-parser.js';
 import { classifyScnRecord, discoverScnRegions } from './scn-layout.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
+import { scnWorldBounds } from './scn-transform.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -332,10 +333,14 @@ function createCatalogGroup(record, palette) {
  root.userData.cabinetId = record.id;
  root.userData.cabinetName = `${record.name} (SCN #${record.id})`;
  root.userData.scnApproximate = true;
+ // Local origin is the source SCN placement point; all parts must inherit the
+ // same Z rotation, otherwise a 180-degree cabinet drifts by its full width.
+ root.position.set(...record.position);
+ root.rotation.z = record.rotationRad || 0;
  for (const part of preview.parts) {
   const partMesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), palette[part.material]);
   partMesh.scale.set(...part.size);
-  partMesh.position.set(...part.position.map((v,i) => record.position[i] + v + part.size[i]*.5));
+  partMesh.position.set(...part.position.map((v,i) => v + part.size[i]*.5));
   partMesh.userData.scnRole = 'catalog-part';
   partMesh.userData.scnMaterialType = part.material;
   partMesh.userData.scnRecord = record;
@@ -347,7 +352,7 @@ function createCatalogGroup(record, palette) {
  // Not raycast-selectable: all size selection comes from the original record.
  if (preview.kind === 'outline') {
   const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(...record.size)),palette.edge);
-  outline.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
+  outline.position.set(...record.size.map(v => v / 2));
   outline.userData.scnOutline=true;
   root.add(outline);
  }
@@ -376,10 +381,13 @@ function buildScnModel(data) {
  root.add(detached);
  groups.set(0,detached);
  const unitBox = new THREE.BoxGeometry(1,1,1);
+ unitBox.translate(.5,.5,.5); // [0,1]^3: rotation pivot is SCN local origin
  const cylinderX = new THREE.CylinderGeometry(.5,.5,1,12);
  cylinderX.rotateZ(Math.PI/2);
+ cylinderX.translate(.5,.5,.5);
  const cylinderZ = new THREE.CylinderGeometry(.5,.5,1,12);
  cylinderZ.rotateX(Math.PI/2);
+ cylinderZ.translate(.5,.5,.5);
  const palette=makeScnMaterials($('finishStyle').value);
  for(const record of data.entries) {
   const role=classifyScnRecord(record);
@@ -392,7 +400,8 @@ function buildScnModel(data) {
    item = new THREE.Mesh(geometry, role === 'panel' || role === 'wall' ? palette.board :
      role === 'fitting' ? palette.metal : palette.reference);
    item.scale.set(...record.size);
-   item.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
+   item.position.set(...record.position);
+   item.rotation.z = record.rotationRad || 0;
    item.userData.scnMaterialType=role==='panel'||role==='wall'?'board':role==='fitting'?'metal':'reference';
    item.userData.partName = record.name + ` (SCN #${record.id})`;
    item.userData.scnApproximate=role!=='panel' && role!=='wall';
@@ -509,7 +518,7 @@ async function openScn(file) {
   setAxis('Z');
   prepareModel(sceneGroup, file.name);
   updateScnExplorer();
-  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. Valós különálló lapok és a katalógusbútorok BECSÜLT, nyitott szerkezeti vázlatai láthatók. A vázlatok nem eredeti alkatrészrajzok.`;
+  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. A lapok és becsült bútorvázlatok eredeti koordinátán, az SCN-ben tárolt elforgatással jelennek meg. A vázlatok nem gyártási alkatrészek.`;
   $('scnInfo').textContent = `${decoded.entries.length} beolvasott rekord · ${scnLayout.layout.regions.length} elkülönülő terület. A valódi lapok SCN-méretűek; a katalógusobjektumok külméret alapján szerkesztett illusztrációk, nem valódi szabászalkatrészek.`;
   notify(`SCN megnyitva: ${decoded.entries.length} rekord · lapokra bontott nézet.`);
  } catch (error) {
@@ -605,7 +614,7 @@ function selectionDetails() {
   return { object: selectedMesh, box: getSelectionBounds(selectedMesh), name,
     size, kind,
     notice: model.userData?.nativeScn ? (selectedMesh.userData.scnRole === 'panel' ?
-     'Különálló, SCN-ben tárolt lap (mm). A pontos elforgatás nem mindig ismert.' :
+     'Különálló SCN-lap (mm), az eredeti helyen és a tárolt Z-elforgatással.' :
      selectedMesh.userData.scnRole === 'catalog-part' ?
      'FIGYELEM: a kiválasztott oldal/tető/polc csupán a katalógusobjektum külső méreteiből becsült 3D vázlatelem! Nem valódi alkatrész vagy szabászméret.' :
      'Katalógus- vagy geometriai objektum: az eredeti részletek nem garantáltak.') :
@@ -615,14 +624,19 @@ function selectionDetails() {
  let box = getSelectionBounds(object);
  if(model.userData.nativeScn && object.userData?.scnRole === 'reference') {
   const rec=object.userData.scnRecord;
-  box=new THREE.Box3(new THREE.Vector3(...rec.position),new THREE.Vector3(...rec.position.map((v,i)=>v+rec.size[i])));
+  // The selection outline is world-aligned; the displayed cabinet dimensions
+  // below are the original LOCAL dimensions, not the expanded rotated AABB.
+  const bounds = scnWorldBounds(rec);
+  box = new THREE.Box3(new THREE.Vector3(...bounds.min),new THREE.Vector3(...bounds.max));
  }
  if(model.userData.nativeScn && object.userData?.scnRegion) {
   const region=object.userData.scnRegion;
   box = new THREE.Box3(new THREE.Vector3(...region.min), new THREE.Vector3(...region.max));
  }
  const name = inferred ? (object.userData?.cabinetName || object.name || 'SCN objektum') : 'Teljes betöltött modell';
- return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn) ? (object.userData?.scnApproximate ? 'Katalógusbútor – becsült vázlat' : object.isMesh ? 'SCN objektum' : 'Bútoregyüttes (becsült)') : 'Szekrény',
+ const original = model.userData.nativeScn && object.userData?.scnRole === 'reference' ? object.userData.scnRecord : null;
+ const displayedSize = original ? new THREE.Vector3(...original.size) : box.getSize(new THREE.Vector3());
+ return { object, box, name, size: displayedSize, kind: (model.userData?.nativeScn) ? (object.userData?.scnApproximate ? 'Katalógusbútor – becsült vázlat' : object.isMesh ? 'SCN objektum' : 'Bútoregyüttes (becsült)') : 'Szekrény',
    notice: inferred
      ? (model.userData?.nativeScn ? (object.userData?.scnApproximate ? 'A külméret az SCN valódi katalógusobjektum-adatából származik; a megjelenített bútorlapok szerkezete becsült, NEM szabásjegyzék.' : 'A látható lapok térbeli csoportjának külső mérete; ez nem igazolt KitchenDraw szekrényhatár.') : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
      : 'A fájl nem tartalmaz felismerhető szekrénycsoportokat: ezért a teljes modell külmérete látható, nem egy külön szekrényé.' };

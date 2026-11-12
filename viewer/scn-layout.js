@@ -4,6 +4,7 @@
  * as though it were a solid cabinet. All grouping is spatial and approximate.
  */
 import { isCoveringWall } from './scn-structure.js';
+import { scnWorldBounds, scnWorldCenter } from './scn-transform.js';
 
 export function classifyScnRecord(record) {
   const name = String(record.name || '').normalize('NFC');
@@ -24,16 +25,16 @@ export function classifyScnRecord(record) {
 }
 
 function boxGap2D(a, b) {
+  const ab = scnWorldBounds(a), bb = scnWorldBounds(b);
   let total = 0;
   for (let axis=0; axis<2; axis++) {
-    const gap = Math.max(0, a.position[axis] - b.position[axis] - b.size[axis],
-      b.position[axis] - a.position[axis] - a.size[axis]);
+    const gap = Math.max(0, ab.min[axis] - bb.max[axis], bb.min[axis] - ab.max[axis]);
     total += gap*gap;
   }
   return Math.sqrt(total);
 }
 function distanceToRegion(record, region) {
-  const p = record.position.map((v,i) => v + record.size[i]/2);
+  const p = scnWorldCenter(record);
   const gapX = Math.max(0, region.min[0]-p[0], p[0]-region.max[0]);
   const gapY = Math.max(0, region.min[1]-p[1], p[1]-region.max[1]);
   return Math.hypot(gapX,gapY);
@@ -59,9 +60,12 @@ export function discoverScnRegions(entries, maxGapMm = 1400) {
   });
   const regions = [...components.values()].map(members=>{
     const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-    for(const record of members) for(let i=0;i<3;i++) {
-      min[i]=Math.min(min[i],record.position[i]);
-      max[i]=Math.max(max[i],record.position[i]+record.size[i]);
+    for(const record of members) {
+      const box = scnWorldBounds(record);
+      for(let i=0;i<3;i++) {
+        min[i]=Math.min(min[i],box.min[i]);
+        max[i]=Math.max(max[i],box.max[i]);
+      }
     }
     return {min,max,panelCount:members.length,panelIds:members.map(x=>x.id)};
   }).sort((a,b)=>b.panelCount-a.panelCount || a.min[0]-b.min[0]);
