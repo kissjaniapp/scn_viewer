@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="dark"/>
+  <title>SCN Viewer – 3D nézegető és méretező</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+ <header class="topbar">
+  <div class="logo"><span class="symbol">▣</span><div><strong>SCN Viewer</strong><small>3D modellnézegető · mm-es mérés</small></div></div>
+  <div class="topactions">
+   <label class="file-button primary" for="fileInput">📂 SCN / 3D fájl megnyitása</label>
+   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.mtl,.jpg,.png,.jpeg" multiple hidden/>
+   <button id="resetView" title="Teljes modell mutatása">Nézet középre</button>
+  </div>
+ </header>
+ <div class="app-shell">
+ <aside class="sidebar">
+  <section>
+   <div class="section-title">Fájl és megjelenítés</div>
+   <div id="filename" class="filename">Nincs megnyitott fájl</div>
+   <div id="fileHint" class="hint">SCN közvetlen megnyitás a helyi KitchenDraw Bridge bővítménnyel; OBJ, 3DS, STL, GLB és GLTF fájlok önállóan is megnyithatók.</div>
+   <div class="form-row"><label for="mmPerUnit">1 modell-egység =</label><div class="inline"><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"/><span>mm</span></div></div>
+   <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
+   <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
+   <label class="check"><input type="checkbox" id="showGrid" checked/> Segédrács</label>
+   <label class="check"><input type="checkbox" id="showEdges"/> Élek kiemelése</label>
+  </section>
+  <section>
+   <div class="section-title">Nézetek</div>
+   <div class="view-grid">
+    <button data-view="iso" class="selected">3D szabad</button>
+    <button data-view="top">Felülnézet</button>
+    <button data-view="front">Elölnézet</button>
+    <button data-view="right">Oldalnézet</button>
+   </div>
+  </section>
+  <section class="selection-section">
+   <div class="section-title">Szekrény / alkatrész kijelölése</div>
+   <div class="form-row"><label for="selectionType">Bal kattintással</label><select id="selectionType"><option value="cabinet">Szekrény kijelölése</option><option value="part">Alkatrész kijelölése</option></select></div>
+   <div class="selected-card">
+     <div class="selection-heading"><small id="selectedKind">–</small><strong id="selectedName">Nincs kijelölve</strong></div>
+     <div class="dimension-grid"><div><span>X – szélesség</span><strong id="sizeX">–</strong></div><div><span id="labelSizeY">Y – mélység</span><strong id="sizeY">–</strong></div><div><span id="labelSizeZ">Z – magasság</span><strong id="sizeZ">–</strong></div></div>
+     <p id="selectedNote" class="hint">Bal kattintással válassz ki egy látható elemet.</p>
+   </div>
+   <button id="clearSelection" class="full">Kijelölés törlése</button>
+  </section>
+  <section class="measure-section">
+   <div class="section-title">Méretezés két pont között</div>
+   <button id="measureToggle" class="measure-button">📏 Mérés bekapcsolása</button>
+   <div class="hint">Bekapcsolva a bal egérgomb két mérőpontot jelöl ki a szekrényen vagy alkatrészen. A jobb gombbal ilyenkor is forgathatod a nézetet.</div>
+   <div class="points"><div><small>1. pont</small><span id="pointA">Nincs</span></div><div><small>2. pont</small><span id="pointB">Nincs</span></div></div>
+   <div class="result"><span>Térbeli távolság</span><strong id="distance">– mm</strong></div>
+   <div class="delta"><div>ΔX <strong id="dx">–</strong></div><div>ΔY <strong id="dy">–</strong></div><div>ΔZ <strong id="dz">–</strong></div></div>
+   <div class="row"><button id="undoPoint">Utolsó pont törlése</button><button id="clearMeasure">Mérés törlése</button></div>
+   <button id="copyMeasure" class="full">Mérés másolása</button>
+  </section>
+  <section>
+   <div class="section-title">KitchenDraw kapcsolat</div>
+   <div id="bridgeStatus" class="hint">Kapcsolat ellenőrzése…</div>
+   <p class="hint">A közvetlen SCN betöltéshez a gépen telepített KitchenDraw és a lefordított KitchenDraw Bridge kiegészítő szükséges. Nem küldünk tervet internetes szerverre.</p>
+   <button id="bridgeHelp" class="full">SCN beállítási útmutató</button>
+  </section>
+  <section id="manifestSection" hidden>
+   <div id="manifestTitle" class="section-title">KitchenDraw elemek</div>
+   <p id="manifestNote" class="hint"></p>
+   <div id="manifestList" class="manifest-list"></div>
+  </section>
+ </aside>
+ <main class="viewport-wrapper">
+  <div id="viewport" aria-label="Forgatható 3D nézet">
+   <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
+   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy 3D modellt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN betöltés: helyi KitchenDraw Bridge szükséges; egyéb 3D fájlok azonnal használhatók.</p><button id="sampleButton">2 szekrényes bemutató megjelenítése</button></div>
+   <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <footer><span>Bal: kijelölés / mérés · Jobb: 3D forgatás · Benyomott görgő: mozgatás · Görgő: zoom</span><span id="modelStats">Nincs modell</span></footer>
+ </main>
+ </div>
+ <div id="scnModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="SCN importálás">
+  <div class="modal-card"><button id="closeModal" class="modal-close" aria-label="Bezárás">✕</button><h2>KitchenDraw SCN kapcsolat</h2><p id="bridgeProblem">A közvetlen megnyitáshoz a KitchenDraw Bridge szükséges.</p>
+  <ol><li>Telepítsd a KitchenDraw-t és a tervhez tartozó katalógusokat.</li><li>A projektből futtasd a <strong>Build_KitchenDraw_Bridge.bat</strong> fájlt (a telepített KD.SDK2.dll szükséges).</li><li>A kapott <strong>KitchenDrawBridge.dll</strong> fájlt regisztráld a KitchenDraw <strong>? → Service → Plugin Manager</strong> menüjében.</li><li>Indítsd újra a KitchenDraw-t, majd indítsd a Viewer <strong>Start_ScnViewer.bat</strong> fájlját, és válaszd ki az SCN-t.</li></ol>
+  <p class="hint">A Viewer az SCN-t helyi ideiglenes mappába másolja, az eredetit nem módosítja. A KitchenDraw SDK a saját katalógusaiból építi fel a 3D geometriát. Ha KitchenDraw nincs telepítve, nem lehet pontosan megjeleníteni az SCN-t pusztán ebből a fájlból.</p><button id="modalOk" class="primary">Rendben</button></div>
+ </div>
+ <script type="module" src="./main.js"></script>
+</body>
+</html>
