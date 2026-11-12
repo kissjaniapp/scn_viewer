@@ -1,3 +1,12 @@
+# SCN Viewer v1.1.0 – Telepítős kiadás
+
+- Inno Setup Windows 11 EXE telepítő; Start menü, opcionális asztali parancsikon, eltávolítás.
+- GitHub Actions automatizált fordítás, telepítő feltöltése az Artifacts részbe.
+- Offline 3D megjelenítő: Three.js modulok a telepítőbe csomagolva.
+- Konzol nélküli indítás és ismételt megnyitás kezelése.
+- Telepítés felhasználói mappába, nincs szükség rendszergazdai jogosultságra.
+- KitchenDraw Bridge helyi fordítási segéd megmaradt, nem tartalmaz külső licencelt SDK-t.
+
 # Változások
 
 ## v1.0 – SCN Bridge (2026-11-12)

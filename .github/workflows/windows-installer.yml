@@ -1,0 +1,65 @@
+name: SCN Viewer - Windows telepítő
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-installer:
+    name: Windows 11 telepítő (EXE)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Forráskód letöltése
+        uses: actions/checkout@v4
+
+      - name: Node.js beállítása (csak a fordításhoz)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Függőségek telepítése
+        run: npm install --no-audit --no-fund
+
+      - name: Forrás tesztek
+        run: npm test
+
+      - name: Offline 3D alkalmazás elkészítése
+        run: npm run build
+
+      - name: Build ellenőrzése
+        shell: pwsh
+        run: |
+          node --check dist/viewer/main.js
+          if (-not (Test-Path dist/viewer/index.html)) { throw 'Missing viewer index' }
+          if (-not (Test-Path dist/SCN_Viewer_Inditas.vbs)) { throw 'Missing Windows launcher' }
+          if ((Get-Content dist/viewer/index.html -Raw) -match 'cdn.jsdelivr.net') { throw 'Remote JS import was not removed' }
+
+      - name: SCN Viewer ikon készítése
+        run: python tools/make_icon.py
+
+      - name: Inno Setup 6 telepítő fordítása
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            choco install innosetup --no-progress --yes
+            $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler not found' }
+          & $compiler installer/SCN_Viewer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup error: $LASTEXITCODE" }
+          Get-ChildItem output/*.exe | Select-Object Name,Length
+
+      - name: EXE telepítő az Artifacts részbe
+        uses: actions/upload-artifact@v4
+        with:
+          name: SCN_Viewer_v1.1.0_Telepito
+          path: output/SCN_Viewer_v1.1.0_Telepito.exe
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0

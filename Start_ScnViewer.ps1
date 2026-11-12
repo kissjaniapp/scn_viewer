@@ -1,10 +1,11 @@
-# SCN Viewer v1.0 - Windows PowerShell 5.1, no external server dependency.
+# SCN Viewer v1.1.0 - Windows PowerShell 5.1, no external server dependency.
 # Loopback-only HTTP server, small, bounded binary upload API for KitchenDraw bridge.
 $ErrorActionPreference = 'Stop'
 $viewer = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'viewer'))
 $bridgeRoot = Join-Path $env:LOCALAPPDATA 'ScnViewerBridge'
 $queue = Join-Path $bridgeRoot 'queue'
 [IO.Directory]::CreateDirectory($queue) | Out-Null
+$pidFile = Join-Path $bridgeRoot 'viewer-server.pid'
 $port = 8765
 $maxUpload = 50MB
 $server = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $port)
@@ -160,7 +161,16 @@ function Serve($client) {
     }
 }
 try {
+    # Desktop shortcuts may be clicked repeatedly: reuse the running viewer.
+    try {
+        $existing = Invoke-RestMethod -Uri 'http://127.0.0.1:8765/api/health' -TimeoutSec 2 -ErrorAction Stop
+        if ($existing.server -eq $true) {
+            Start-Process 'http://127.0.0.1:8765/'
+            return
+        }
+    } catch { }
     $server.Start()
+    [IO.File]::WriteAllText($pidFile, [string]$PID)
     Write-Host 'SCN Viewer: http://127.0.0.1:8765' -ForegroundColor Cyan
     Write-Host 'KitchenDraw bovitmeny allapota a Viewerben lathato.' -ForegroundColor Gray
     Write-Host 'Megallitas: Ctrl+C' -ForegroundColor Gray
@@ -170,6 +180,18 @@ try {
         try { Serve $client } finally { $client.Close() }
     }
 } catch {
-    Write-Host ('Nem sikerult inditani: ' + $_.Exception.Message) -ForegroundColor Red
-    Read-Host 'Nyomj Entert a bezarashoz'
-} finally { $server.Stop() }
+    $message = 'Az SCN Viewer nem indult el. ' + $_.Exception.Message
+    $logFile = Join-Path $bridgeRoot 'startup-error.log'
+    try { [IO.File]::AppendAllText($logFile, ((Get-Date).ToString('s') + ' ' + $message + [Environment]::NewLine)) } catch { }
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show($message, 'SCN Viewer - indítási hiba', 'OK', 'Error') | Out-Null
+    } catch { Write-Warning $message }
+} finally {
+    try { $server.Stop() } catch { }
+    try {
+        if ([IO.File]::Exists($pidFile) -and [IO.File]::ReadAllText($pidFile).Trim() -eq [string]$PID) {
+            [IO.File]::Delete($pidFile)
+        }
+    } catch { }
+}

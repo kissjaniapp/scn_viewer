@@ -10,3 +10,8 @@ KitchenDrawBridge/*.dll
 *.scn
 *.obj.tmp
 *.zip
+
+node_modules/
+dist/
+output/
+*.log

@@ -1,0 +1,16 @@
+{
+  "name": "scn-viewer-installer",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Offline Three.js bundling and Windows installer packaging for SCN Viewer",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
