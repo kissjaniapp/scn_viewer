@@ -1,5 +1,5 @@
 #define MyAppName "SCN Viewer"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "kissjaniapp"
 #define MyAppURL "https://github.com/kissjaniapp/scn_viewer"
 
@@ -43,14 +43,16 @@ Source: "..\packed\win-unpacked\*"; DestDir: "{app}"; Flags: ignoreversion recur
 Source: "SCNViewer.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
-; Remove obsolete invisible PowerShell / VBScript launchers from v1.1.
+; Clean up prior KitchenDraw-specific bridge / old launchers.
 Type: files; Name: "{app}\SCN_Viewer_Inditas.vbs"
 Type: files; Name: "{app}\Start_ScnViewer.ps1"
 Type: files; Name: "{app}\Start_ScnViewer.bat"
+Type: filesandordirs; Name: "{app}\resources\KitchenDrawBridge"
+Type: files; Name: "{app}\resources\Build_KitchenDraw_Bridge.ps1"
+Type: files; Name: "{app}\resources\Build_KitchenDraw_Bridge.bat"
 
 [Icons]
 Name: "{autoprograms}\SCN Viewer\SCN Viewer"; Filename: "{app}\SCN Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"
-Name: "{autoprograms}\SCN Viewer\KitchenDraw Bridge - beállítás"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\resources\Build_KitchenDraw_Bridge.ps1"""; WorkingDir: "{app}\resources"; IconFilename: "{app}\SCNViewer.ico"
 Name: "{autodesktop}\SCN Viewer"; Filename: "{app}\SCN Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"; Tasks: desktopicon
 
 [Run]

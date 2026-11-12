@@ -1,3 +1,4 @@
+import { decodeScn } from './scn-parser.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -208,98 +209,99 @@ function prepareModel(group, name) {
  $('modelStats').title = `${meshes.length} háló`;
  notify(`Modell megnyitva: ${name} (${meshes.length} objektum)`);
 }
-function confirmScn(message = '') {
- $('scnModal').classList.remove('hidden');
- $('bridgeProblem').textContent = message || 'A közvetlen megnyitáshoz a helyi KitchenDraw Bridge kiegészítő szükséges.';
+
+// Native binary KitchenDraw SCN import: no KitchenDraw, SDK or bridge.
+// The currently decoded variant stores real sizes and placements in mm,
+// but catalog-defined details are reconstructed as bounding solids.
+function scnColor(entry) {
+ if (/^CUBE$/i.test(entry.name)) return 0x78abc1;
+ if (/PANEL/i.test(entry.name)) return 0xc59b70;
+ if (/^CYL/i.test(entry.name)) return 0xb0c6c7;
+ if (/PULT|ND_|KÉZMOSÓ|átadó/i.test(entry.name)) return 0x789bb2;
+ return 0x90aaa5;
 }
-let requestedJob = 0;
-function setBridgeState(message, ready) {
- $('bridgeStatus').textContent = message;
- $('bridgeStatus').classList.toggle('bridge-ready', ready);
+function isScnCabinetAnchor(entry) {
+ return /PULT|ND_1300|UNOX|KÉZMOSÓ|átadó/i.test(entry.name);
 }
-async function bridgeHealth() {
- try {
-  if (!['127.0.0.1', 'localhost'].includes(window.location.hostname)) throw new Error('Nem a helyi Viewer fut.');
-  const response = await fetch('/api/health', {cache:'no-store'});
-  if (!response.ok) throw new Error('A helyi kiszolgáló nem érhető el.');
-  const health = await response.json();
-  if (!health.server) throw new Error('Nem a helyi SCN Viewer fut.');
-  setBridgeState(health.bridge ? 'KitchenDraw Bridge: kapcsolódva' : 'KitchenDraw Bridge: nincs kapcsolódva', health.bridge);
-  return health.bridge;
- } catch {
-  setBridgeState('Közvetlen SCN: helyi kiszolgáló szükséges', false);
-  return false;
+function buildScnModel(data) {
+ const group = new THREE.Group();
+ group.name = 'SCN jelenet — saját bináris dekóder';
+ group.userData.nativeScn = true;
+ const cube = new THREE.BoxGeometry(1, 1, 1);
+ const cylinderX = new THREE.CylinderGeometry(.5, .5, 1, 16);
+ cylinderX.rotateZ(Math.PI / 2);
+ const cylinderZ = new THREE.CylinderGeometry(.5, .5, 1, 16);
+ cylinderZ.rotateX(Math.PI / 2);
+ const materialCache = new Map();
+ const objects = [];
+ for (const record of data.entries) {
+  const color = scnColor(record);
+  let material = materialCache.get(color);
+  if (!material) {
+   material = new THREE.MeshStandardMaterial({color, roughness:.82, metalness:.02, side:THREE.DoubleSide});
+   materialCache.set(color, material);
+  }
+  const geometry = record.type === 'cylinderX' ? cylinderX : record.type === 'cylinderZ' ? cylinderZ : cube;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.scale.set(...record.size);
+  mesh.position.set(...record.position.map((v, i) => v + record.size[i] / 2));
+  mesh.name = `${record.name} #${record.id}`;
+  mesh.userData.partName = record.name + ` [SCN #${record.id}]`;
+  mesh.userData.scnRecord = record;
+  mesh.userData.scnApproximate = true;
+  objects.push({mesh, record});
  }
-}
-function showManifest(data) {
- const section = $('manifestSection');
- const list = $('manifestList');
- list.replaceChildren();
- if (!data || !Array.isArray(data.objects)) { section.hidden = true; return; }
- section.hidden = false;
- $('manifestTitle').textContent = `KitchenDraw elemek (${data.objects.length} db)`;
- for (const item of data.objects.slice(0, 100)) {
-  const row = document.createElement('div'); row.className = 'manifest-item';
-  const name = document.createElement('strong'); name.textContent = item.name || item.reference || `Elem #${item.id}`;
-  const size = document.createElement('small');
-  const vals = [item.widthMm, item.depthMm, item.heightMm];
-  size.textContent = vals.every(Number.isFinite) ? vals.map(x => format(x,1)).join(' × ') + ' mm' : 'Méret nem elérhető';
-  row.append(name, size); list.append(row);
+ // Associate primitives with the best fitting named furniture bounding boxes.
+ // This is a spatial aid, NOT a claim that KitchenDraw's proprietary component
+ // hierarchy or exact CNC panel tree has been recovered.
+ const anchors = objects.filter(({record}) => isScnCabinetAnchor(record));
+ const groups = anchors.map(({record}) => {
+  const cabinet = new THREE.Group();
+  cabinet.name = record.name + ` (SCN csoport — becslés)`;
+  cabinet.userData.cabinetName = cabinet.name;
+  cabinet.userData.scnApproximate = true;
+  group.add(cabinet);
+  return {record,cabinet};
+ });
+ for (const {mesh,record} of objects) {
+  const ownAnchor = groups.find(g => g.record === record);
+  if (ownAnchor) { ownAnchor.cabinet.add(mesh); continue; }
+  if (record.name !== 'CUBE' && !/^CYL|^PLAN1$|PANEL/i.test(record.name)) {
+   group.add(mesh); continue;
+  }
+  const center = record.position.map((x,i) => x + record.size[i]/2);
+  let best = null, score = Infinity;
+  for (const g of groups) {
+   const p=g.record.position, d=g.record.size;
+   // A surrounding furniture object must encompass the panel center with
+   // a small tolerance; never attach distant elements by mere proximity.
+   const delta = center.map((v,i) => Math.max(p[i]-180-v, 0, v-(p[i]+d[i]+180)));
+   if (delta.some(v => v > 0)) continue;
+   const dist = Math.hypot(...center.map((v,i) => (v-(p[i]+d[i]/2))/(d[i]+1)));
+   if (dist<score) {score=dist; best=g;}
+  }
+  (best ? best.cabinet : group).add(mesh);
  }
- if (data.objects.length > 100) {
-  const extra = document.createElement('p'); extra.className = 'hint';
-  extra.textContent = `További ${data.objects.length - 100} elem (a lista az első 100-at mutatja).`;
-  list.append(extra);
- }
- $('manifestNote').textContent = 'A KitchenDraw által tárolt méretek. Az OBJ háromszöghálóinak csoportosításától független lista; kijelöléskor a kijelölt háló mérete jelenik meg.';
+ return group;
 }
 async function openScn(file) {
- const job = ++requestedJob;
- const ready = await bridgeHealth();
- if (!ready) { confirmScn('A KitchenDraw Bridge nem aktív. Előbb fordítsd le és regisztráld a kiegészítőt, majd indítsd el a KitchenDraw-ot. A helyi Viewer továbbra is használható OBJ fájlokkal.'); return; }
- if (file.size > 50 * 1024 * 1024) { notify('Ez az SCN meghaladja az 50 MB-os biztonsági korlátot.'); return; }
  try {
-  $('filename').textContent = file.name;
-  $('fileHint').textContent = 'SCN betöltése KitchenDraw segítségével…';
-  setBridgeState('SCN feldolgozása…', true);
-  const response = await fetch('/api/scn', { method:'POST', headers:{'Content-Type':'application/octet-stream','X-Scn-Viewer':'1'}, body:file });
-  if (!response.ok) throw new Error(`Az SCN átadása sikertelen (HTTP ${response.status}).`);
-  const {id} = await response.json();
-  if (!/^[a-f0-9]{32}$/.test(id || '')) throw new Error('Hibás feldolgozásazonosító.');
-  let state = 'pending';
-  for (let attempt = 0; attempt < 180; attempt++) { // 6 minutes max; large scenes take longer
-   if (requestedJob !== job) return;
-   const st = await fetch(`/api/jobs/${id}`, {cache:'no-store'});
-   if (!st.ok) throw new Error('Nem érhető el az SCN átalakításának állapota.');
-   const result = await st.json(); state = result.state;
-   if (state === 'error') throw new Error(result.message || 'A KitchenDraw nem tudta exportálni az SCN fájlt.');
-   if (state === 'done') {
-    const objResponse = await fetch(`/api/model/${id}`, {cache:'no-store'});
-    if (!objResponse.ok) throw new Error('A 3D modell nem olvasható.');
-    const obj = new OBJLoader().parse(await objResponse.text());
-    if (new THREE.Box3().setFromObject(obj).isEmpty()) throw new Error('Az SCN export nem tartalmaz látható háromszöghálót.');
-    if (requestedJob !== job) return;
-    $('upAxis').value = 'Z';
-    setAxis('Z');
-    prepareModel(obj, file.name);
-    try {
-     const metaResponse = await fetch(`/api/manifest/${id}`, {cache:'no-store'});
-     if (metaResponse.ok) showManifest(await metaResponse.json());
-     else showManifest(null);
-    } catch { showManifest(null); }
-    $('fileHint').textContent = 'KitchenDraw SCN betöltve a helyi bővítménnyel. A pontos mm-es méréshez ellenőrizd a modell-egység arányát (OBJ alapérték: 1).';
-    setBridgeState('SCN megnyitva', true);
-    return;
-   }
-   setBridgeState(state === 'working' ? 'KitchenDraw 3D export folyamatban…' : 'SCN feldolgozásra vár…', true);
-   await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  throw new Error('Nem érkezett válasz a KitchenDraw-tól. Ellenőrizd, hogy fut-e a program és aktív-e a kiegészítő.');
+  if (file.size > 50 * 1024 * 1024) throw new Error('Legfeljebb 50 MB-os SCN nyitható meg.');
+  $('fileHint').textContent = 'SCN bináris objektumadatok feldolgozása…';
+  const decoded = decodeScn(await file.arrayBuffer());
+  const sceneGroup = buildScnModel(decoded);
+  $('upAxis').value = 'Z';
+  $('mmPerUnit').value = '1';
+  mmPerUnit = 1;
+  setAxis('Z');
+  prepareModel(sceneGroup, file.name);
+  $('fileHint').textContent = `${decoded.entries.length} valós SCN-objektum és mm-es koordinátája beolvasva. A katalógusfüggő részleteket a Viewer befoglaló testekkel helyettesíti; az ezek felületén végzett mérés közelítő.`;
+  $('scnInfo').textContent = `${decoded.entries.length} elem · ${decoded.recognized} ismert rekord · ${decoded.unsupported} kihagyott sablon/nem támogatott rekord. Az objektumméretek és az elhelyezés közvetlenül az SCN-ből származnak, nem a bemutatómodellből.`;
+  notify(`Valódi SCN megnyitva: ${decoded.entries.length} objektum (egyszerűsített 3D).`);
  } catch (error) {
   console.error(error);
-  $('fileHint').textContent = 'SCN átalakítási hiba: ' + (error.message || String(error));
-  setBridgeState('SCN átalakítás sikertelen', false);
-  notify(error.message || String(error));
+  $('fileHint').textContent = 'Nem támogatott SCN változat vagy sérült fájl: ' + (error?.message || String(error));
+  notify('SCN beolvasási hiba: ' + (error?.message || String(error)));
  }
 }
 async function openFiles(files) {
@@ -375,6 +377,7 @@ function findCabinetGroup(mesh) {
  const branch = hierarchy.at(-1);
  if (branch && model.children.length > 1 && meshCount(branch) > 1) return { object: branch, inferred: true };
  // When cabinet boundaries were lost in export, never call an arbitrary mesh a cabinet.
+ if (model.userData?.nativeScn) return {object: mesh, inferred: true};
  return { object: model, inferred: false };
 }
 function selectionDetails() {
@@ -385,14 +388,14 @@ function selectionDetails() {
   const name = selectedMesh.userData?.partName || selectedMesh.name || `Alkatrész ${meshNumbers.get(selectedMesh) || ''}`;
   return { object: selectedMesh, box: getSelectionBounds(selectedMesh), name,
     size, kind: 'Alkatrész',
-    notice: 'Az alkatrész saját geometriájának méretei. Több alkatrész összevont 3D hálóját a Viewer nem tudja különválasztani.' };
+    notice: model.userData?.nativeScn ? 'Méret közvetlenül az SCN objektumrekordjából (mm). A kirajzolt alakzat a befoglaló forma közelítése.' : 'Az alkatrész saját geometriájának méretei. Több alkatrész összevont 3D hálóját a Viewer nem tudja különválasztani.' };
  }
  const { object, inferred } = findCabinetGroup(selectedMesh);
  const box = getSelectionBounds(object);
- const name = inferred ? (object.userData?.cabinetName || object.name || 'Szekrénycsoport') : 'Teljes betöltött modell';
- return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: 'Szekrény',
+ const name = inferred ? (object.userData?.cabinetName || object.name || 'SCN objektum') : 'Teljes betöltött modell';
+ return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn && object.isMesh) ? 'SCN objektum' : 'Szekrény',
    notice: inferred
-     ? 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.'
+     ? (model.userData?.nativeScn ? 'SCN-adatokból számolt befoglaló méret. Az eredeti gyártói 3D forma és szekrénycsoport határa nem minden esetben ismert.' : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
      : 'A fájl nem tartalmaz felismerhető szekrénycsoportokat: ezért a teljes modell külmérete látható, nem egy külön szekrényé.' };
 }
 function clearSelection() {
@@ -574,36 +577,6 @@ $('copyMeasure').addEventListener('click', async () => {
  catch { notify('Másolás nem támogatott ezen a címen (használj localhost-ot vagy HTTPS-t).'); }
 });
 document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
-$('bridgeHelp').addEventListener('click', () => confirmScn());
-$('closeModal').addEventListener('click', () => $('scnModal').classList.add('hidden'));
-$('modalOk').addEventListener('click', () => $('scnModal').classList.add('hidden'));
-$('scnModal').addEventListener('click', e => { if (e.target === $('scnModal')) $('scnModal').classList.add('hidden'); });
-$('sampleButton').addEventListener('click', () => {
- const sample = new THREE.Group();
- sample.name = 'Bútor bemutató';
- function panel(group, name, x, y, z, w, d, h, color) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), new THREE.MeshStandardMaterial({color, roughness:.78}));
-  mesh.name = name;
-  mesh.position.set(x, y, z);
-  group.add(mesh);
- }
- function cupboard(name, cx, w, height, color) {
-  const group = new THREE.Group();
-  group.name = name;
-  group.position.x = cx;
-  panel(group, 'Bal oldallap', -w/2+9, 0, height/2, 18, 420, height, color);
-  panel(group, 'Jobb oldallap', w/2-9, 0, height/2, 18, 420, height, color);
-  panel(group, 'Fenék', 0, 0, 9, w-36, 420, 18, color);
-  panel(group, 'Tető', 0, 0, height-9, w-36, 420, 18, color);
-  panel(group, 'Polc', 0, 0, height/2, w-36, 405, 18, 0xc4a27a);
-  sample.add(group);
- }
- cupboard('1. szekrény', -400, 600, 720, 0x86b9d0);
- cupboard('2. szekrény', 400, 800, 840, 0x9ec2a2);
- $('upAxis').value = 'Z';
- setAxis('Z');
- prepareModel(sample, 'Bemutató: 2 szekrény és külön alkatrészek');
-});
 viewport.addEventListener('dragover', e => { e.preventDefault(); viewport.style.outline = '2px dashed #4ec5ff'; });
 viewport.addEventListener('dragleave', () => viewport.style.outline = 'none');
 viewport.addEventListener('drop', e => { e.preventDefault(); viewport.style.outline = 'none'; openFiles(e.dataTransfer.files); });
@@ -626,5 +599,3 @@ new ResizeObserver(() => { resize(); invalidate(); }).observe(viewport);
 resize();
 invalidate();
 
-bridgeHealth();
-setInterval(bridgeHealth, 12000);

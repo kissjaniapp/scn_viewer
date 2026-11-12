@@ -26,10 +26,4 @@ if (!importMap.test(html)) throw new Error('Missing import map in source HTML. R
 html = html.replace(importMap, '');
 await writeFile(path.join(dist, 'viewer/index.html'), html, 'utf8');
 await cp(path.join(root, 'viewer/style.css'), path.join(dist, 'viewer/style.css'));
-for (const name of ['Start_ScnViewer.ps1', 'Stop_ScnViewer.ps1', 'SCN_Viewer_Inditas.vbs',
-                    'Build_KitchenDraw_Bridge.bat', 'Build_KitchenDraw_Bridge.ps1', 'README.md']) {
-  await cp(path.join(root, name), path.join(dist, name));
-}
-await cp(path.join(root, 'KitchenDrawBridge'), path.join(dist, 'KitchenDrawBridge'), { recursive: true });
-await cp(path.join(root, 'examples'), path.join(dist, 'examples'), { recursive: true });
 console.log('Offline Windows application staged in dist/.');

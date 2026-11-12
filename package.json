@@ -2,14 +2,14 @@
   "name": "scn-viewer-desktop",
   "productName": "SCN Viewer",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "main": "desktop/main.cjs",
-  "description": "SCN Viewer - native Windows desktop window with three-dimensional measurement",
+  "description": "Native standalone Windows SCN Viewer with independent binary parser and mm measurement",
   "scripts": {
     "build": "node tools/build.mjs",
     "desktop": "npm run build && electron .",
     "package:win": "electron-builder --win --dir --x64",
-    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py"
+    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py && node tests/test_scn_parser.mjs"
   },
   "dependencies": {
     "three": "0.170.0"
@@ -24,17 +24,14 @@
     "productName": "SCN Viewer",
     "asar": true,
     "npmRebuild": false,
-    "directories": { "output": "packed" },
+    "directories": {
+      "output": "packed"
+    },
     "files": [
       "desktop/**/*",
       "dist/viewer/**/*",
       "installer/SCNViewer.ico",
       "package.json"
-    ],
-    "extraResources": [
-      { "from": "KitchenDrawBridge", "to": "KitchenDrawBridge" },
-      { "from": "Build_KitchenDraw_Bridge.ps1", "to": "Build_KitchenDraw_Bridge.ps1" },
-      { "from": "Build_KitchenDraw_Bridge.bat", "to": "Build_KitchenDraw_Bridge.bat" }
     ],
     "win": {
       "icon": "installer/SCNViewer.ico",

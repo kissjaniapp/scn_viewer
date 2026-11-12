@@ -1,37 +1,8 @@
-# Változások
+# SCN Viewer v1.3.0
 
-## v1.2.0 – saját ablakos Windows alkalmazás és indítási javítás
-- A rejtett PowerShell + böngésző indítás helyett önálló Electron program (`SCN Viewer.exe`).
-- Előző, v1.1-es AppId megőrzése: felültelepítéskor ugyanazt az alkalmazást frissíti.
-- Beépített, csak loopback felületen futó HTTP/API helyi kiszolgáló; nincs fix portütközés.
-- Egységes programablak, Start menü és asztali parancsikon, leállás az ablak bezárásával.
-- Az eddigi forgatás, kijelölés és milliméteres mérés változatlan.
-- SCN-import a KitchenDraw Bridge segítségével változatlanul rendelkezésre áll; KitchenDraw-környezetben még külön tesztelendő.
-- Windows GitHub Actions Artifacts telepítőépítés, helyi API-integrációs teszt.
-
-# SCN Viewer v1.1.0 – Telepítős kiadás
-
-- Inno Setup Windows 11 EXE telepítő; Start menü, opcionális asztali parancsikon, eltávolítás.
-- GitHub Actions automatizált fordítás, telepítő feltöltése az Artifacts részbe.
-- Offline 3D megjelenítő: Three.js modulok a telepítőbe csomagolva.
-- Konzol nélküli indítás és ismételt megnyitás kezelése.
-- Telepítés felhasználói mappába, nincs szükség rendszergazdai jogosultságra.
-- KitchenDraw Bridge helyi fordítási segéd megmaradt, nem tartalmaz külső licencelt SDK-t.
-
-# Változások
-
-## v1.0 – SCN Bridge (2026-11-12)
-
-- Új: SCN fájl közvetlen kiválasztása a Viewerben, helyi konverziós feladatküldéssel.
-- Új: KitchenDraw SDK2 alapú, telepített KitchenDraw-ban futó feladatfeldolgozó plugin (`Scene.Load` és `Scene.Export3dGeometry`).
-- Új: SDK-ból kinyert KitchenDraw objektumméretek külön, milliméteres listában.
-- Új: natív PowerShell 5.1 helyi HTTP kiszolgáló SCN fájlfogadással és feldolgozásállapot-jelzéssel.
-- Új: Bridge kapcsolatjelző és hibakezelés, útmutató az alkalmazásban.
-- Biztonság: a webkiszolgáló csak loopback címen figyel; 50 MB feltöltési korlát; nincs felhőfeltöltés, és a plugin nem dobja el a nem mentett tervet.
-- Ismert korlát: a Windows KitchenDraw bővítmény környezetbeli tesztje és a felhasználói SCN teljes megjelenítése még hátravan.
-
-## v0.2 – Egérkezelés, kijelölés és mérés
-
-- Jobb forgatás, görgő nagyítás, középső pan, bal gomb kijelölés/mérés.
-- Szekrény és alkatrész módban méretkijelzés, kétpontos mérés.
-- Igény szerinti renderelés, rács, nézetek, bemutató szekrények.
+- Közvetlen, független `.scn` bináris rekordolvasó.
+- A feltöltött mintában 463 valós SCN objektum, X/Y/Z méret és pozíció mm-ben.
+- Katalógusgeometria korlátozott: a teljes 3D helyett befoglaló testek.
+- KitchenDraw Bridge UI, telepítőparancsikon és helyi feltöltő API eltávolítva.
+- Marad a gyorsított 3D forgatás, mérés, és az önálló Electron Windows telepítő.
+- Regressziós teszt valódi mintafájllal helyben, mintafájlt nem publikálunk.
