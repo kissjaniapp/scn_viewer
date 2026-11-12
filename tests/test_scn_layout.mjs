@@ -15,8 +15,8 @@ if(process.env.SCN_TEST_FILE) {
  const scn=decodeScn(readFileSync(process.env.SCN_TEST_FILE));
  const structural=scn.entries.filter(x=>classifyScnRecord(x)==='panel');
  const zones=discoverScnRegions(scn.entries);
- assert.equal(structural.length,110);
- assert.deepEqual(zones.regions.slice(0,2).map(x=>x.panelCount),[63,45]);
+ assert.equal(structural.length,108);
+ assert.deepEqual(zones.regions.slice(0,2).map(x=>x.panelCount),[62,44]);
  assert(zones.regions.length >= 2);
  console.log(`OK: saját SCN lapok=${structural.length}, területek=${zones.regions.map(x=>x.panelCount).join('/')}`);
 }

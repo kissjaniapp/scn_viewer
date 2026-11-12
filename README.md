@@ -1,51 +1,55 @@
-# SCN Viewer v1.4.0 – önálló Windows alkalmazás
+# SCN Viewer v1.5.0 – látható bútorvázlatok
 
-**KitchenDraw nélkül működő**, magyar nyelvű 3D nézegető és mm-es mérő. Saját asztali ablakkal települ Windows 11-re. Nincs Bridge, KitchenDraw vagy internetes SCN-feldolgozás.
+**KitchenDraw nélkül használható**, önálló Windows 11 alkalmazás, közvetlen `.scn` fájlnyitással, 3D nézettel, alkatrész-/bútorválasztással és milliméteres méréssel.
 
-## Telepítés (GitHub Artifacts)
+## Telepítés GitHub Actions / Artifacts
 
-1. Nyisd meg a [Windows telepítő munkafolyamatát](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml).
-2. A legutóbbi sikeres futás **Artifacts** részében válaszd a `SCN_Viewer_v1.4.0_Telepito` csomagot.
-3. A ZIP-ből csomagold ki a `SCN_Viewer_v1.4.0_Telepito.exe` telepítőt. A korábbi kiadás helyére telepíthető.
-4. A Start menüben/asztali ikonon keresztül indítsd el; saját ablakban fut.
+1. Nyisd meg a [Windows telepítő Actions oldalt](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml).
+2. A legutóbbi sikeres futás **Artifacts** részében válaszd a `SCN_Viewer_v1.5.0_Telepito` csomagot.
+3. Csomagold ki a letöltött ZIP-et és indítsd a `SCN_Viewer_v1.5.0_Telepito.exe` fájlt.
+4. Az asztali vagy Start menüs **SCN Viewer** parancsikonnal saját ablakban indul. A régi verzióra telepíthető.
 
-## SCN megnyitás és megjelenés
+## Mit javít a v1.5?
 
-A megnyitás gombbal közvetlenül betölthetők a támogatott KitchenDraw SCN bináris rekordszerkezettel rendelkező állományok. A 2026. november 12-i, privát `64F080FA_4198_01.scn` mintából a dekóder 463 mérettel és pozícióval rendelkező rekordot olvasott ki; 101 dekorpanelt és 9 egyéb vékony lapot **külön-külön** jelenít meg. A névvel rendelkező katalógusobjektumok megőrzik a tárolt befoglaló méretüket, de alapból csak az oldalsávból találhatók meg (a körvonalas nézet választható), és nem takarják el a tényleges lapszerkezetet.
+**A v1.4-ben az volt a gond, hogy a 34 katalógushivatkozást alapból elrejtettük**. Ezek közül sok valójában a megtervezett bútorokra és berendezésekre hivatkozik; ezért a 3D nézetből a szekrények jelentős része hiányzott.
 
-A felismerhető lapok 4 térbeli területbe szervezhetők (63 / 45 / 1 / 1 elem); alapból a legnagyobb látható, a többi a „Melyik bútoregyüttest nézed?” listából választható. A területek **nem igazolt KitchenDraw szekrények**: a Viewer a lapok szomszédságából következtet, így több szekrény is egy területbe kerülhet. Ezt nem helyettesítjük kitalált szekrénynevekkel.
+A v1.5-ben külön kezeljük:
 
-### Saját megjelenítési stílusok
+- **108 eredeti lapszerű rekord** (a méret és a pozíció ténylegesen az SCN-ből kiolvasott érték). Ezek külön 3D lapok és kijelölhetők.
+- **2 nagy, takaró dekorpanel**. Alapértelmezésben rejtett, de a *Nagy takarófalak és dekorparavánok* jelölővel visszakapcsolható.
+- **24 katalógusobjektum**, amelyeknek rendelkezésre áll a valódi külső mérete és pozíciója, de **a belső szerkezete nem szerepel részletes geometriaként** az SCN-ben. Ezekhez most nyitott szerkezeti 3D **vázlatot** készítünk (oldalak, fenék, tető, hátlap; néhány esetben illusztratív polc vagy osztó).
+- **10 berendezés**. Ezeket külön burkolatként és előlapként illusztráljuk, nem szekrénylapként.
 
-- **Világos tölgy:** finoman generált faerezet (nem KitchenDraw textúra).
-- **Matt fehér:** tiszta, jól áttekinthető korpuszrajz.
-- **Grafit:** sötétebb, műszaki bemutató nézet.
+**Nagyon fontos:** a program által becsült oldallapok, polcok, osztók stb. **nem eredeti SCN-alkatrészrekordok**, és méretük **nem használható közvetlenül szabásjegyzékhez vagy CNC-hez**. A katalógusobjektumok *külmérete* az eredeti fájlból származik, de belső felépítésüket a KitchenDraw külön katalógusa nélkül nem ismerjük. A program külön jelzi a vázlatos elemeket.
 
-A vékony panelek és a nagy burkoló referenciák elkülönítése fontosabb a fotórealisztikus anyagmintázatnál. A látvány bármikor váltható.
+### Bútorok láthatósága
 
-## Kezelés
+Az SCN megnyitása után a **Bútorok 3D vázlatai (becsült)** kapcsoló alapból *be van kapcsolva*. Külön jelölővel visszakapcsolhatók a nagyméretű takarófalak és a kisméretű szerelvények. A név szerinti *Szekrények és berendezések* listában kattintással az adott objektumra lehet ugrani, annak forrásbeli külméretét megnézni. A területek térbeli csoportok, nem KitchenDraw-azonosítók.
 
-| Egér | Funkció |
+A privát `64F080FA_4198_01.scn` minta alapján jelenleg 4 térbeli terület különíthető el. A két legnagyobb 62 és 44 valódi lapszerű rekordot tartalmaz; a többi a területválasztóval érhető el.
+
+### Egérkezelés – változatlan
+
+| Egér | Művelet |
 | --- | --- |
-| Jobb gomb húzása | Stabil 3D körbeforgatás a függőleges tengely körül (Tinkercad-szerű CAD-mozgás) |
-| Benyomott görgő húzása | Nézet eltolása |
-| Görgő tekerése | Nagyítás, kicsinyítés |
-| Bal kattintás | Látható lap vagy becsült bútoregyüttes kiválasztása |
-| Mérés gomb + két bal kattintás | Két felületi pont térbeli távolsága és ΔX/ΔY/ΔZ mm-ben |
+| Jobb gomb + mozgatás | Tinkercad-szerű 3D forgatás |
+| Görgő forgatása | Közelítés/távolítás |
+| Görgő benyomva + mozgatás | Nézet eltolása |
+| Bal gomb, *Szekrény* kijelölési mód | Eredeti katalógus-külméret vagy becsült bútoregyüttes-külméret |
+| Bal gomb, *Alkatrész* kijelölési mód | Valódi SCN lap vagy **egyértelműen becsült** vázlatelem |
+| Mérés be + két bal kattintás | Pontok közötti távolság és tengelyirányú eltérések mm-ben |
 
-## Műszaki pontosság és ismert korlát
+Megmarad a saját világos tölgy, matt fehér és grafit anyagstílus. A geometria szándékosan egyszerűsített, nem a KitchenDraw rajzolási vagy textúrarendszerét másolja.
 
-A dekóder **nem a teljes KitchenDraw SCN dokumentáció alapján készült**. A támogatott SCN rekordok X/Y/Z méreteit és elhelyezkedését képes beolvasni, de a katalógusokból származó egyedi alkatrészformák, minden elforgatás, hiteles bútorfa és fotótextúra nem áll rendelkezésre. A lapokat ezért egyszerű téglatestként rajzoljuk a *forrásbeli külön méretekkel*, a katalógusobjektumokat pedig csak opcionális becsült körvonalakkal. Ezek a modellek **nem gyártásra hitelesített CAD geometria**, és CNC/programgenerálásra önmagukban nem alkalmasak.
+## Fejlesztés és tesztek
 
-A kívánt pontosság a modellrekord méretére vonatkozik; a kétpontos mérés a megjelenített, helyettesítő síkfelületeket méri. Más SCN formátumváltozatokhoz további dekóderfejlesztés szükséges lehet.
+A projekt lokálisan: `npm install`, `npm test`, `npm run build`, `npm run desktop`. A privát mintával további teszt:
 
-## Fejlesztői ellenőrzés
-
-`npm test` ellenőrzi a dekódert, területfelismerést, 3D kezelőket és helyi HTTP szervert. Ha a privát mintafájlt elérhetővé teszed helyben a teszteknek, a saját SCN konkrét, 463 rekordos változatát a következővel is ellenőrizheted:
-
-```
-SCN_TEST_FILE=/path/to/64F080FA_4198_01.scn node tests/test_scn_parser.mjs
+```shell
+SCN_TEST_FILE=/path/to/64F080FA_4198_01.scn node tests/test_scn_structure.mjs
 SCN_TEST_FILE=/path/to/64F080FA_4198_01.scn node tests/test_scn_layout.mjs
 ```
 
-A privát SCN fájlt **nem szabad** hozzáadni a nyilvános repositoryhoz. A projekt Inno Setup + Electron alapon állít elő Windows telepítőt GitHub Actions Artifacts-ba. A telepítő nincs digitálisan aláírva, így SmartScreen figyelmeztethet.
+A privát SCN **nincs a nyilvános GitHubban**. A GitHub Actions Windows-runnert használ Electron + Inno Setup telepítőhöz. A telepítő nincs digitálisan aláírva; a Windows SmartScreen figyelmeztethet.
+
+**Korlát:** a teljes KitchenDraw katalógusgeometria, a tényleges bútorhierarchia és az egyes elforgatások nem olvashatók ki megbízhatóan ebből az SCN-rekordváltozatból. A katalógusbútor-vázlatok vizuális tájékozódáshoz készültek, nem hiteles visszafejtett gyártási alkatrészek.

@@ -3,11 +3,13 @@
  * A catalog reference is not panel geometry: do not render its enclosing box
  * as though it were a solid cabinet. All grouping is spatial and approximate.
  */
+import { isCoveringWall } from './scn-structure.js';
+
 export function classifyScnRecord(record) {
   const name = String(record.name || '').normalize('NFC');
   const dimensions = record.size || [];
   if (!Array.isArray(dimensions) || dimensions.length !== 3 || dimensions.some(n => !Number.isFinite(n) || n <= 0)) return 'invalid';
-  if (/DECO\s*PANEL/i.test(name)) return 'panel';
+  if (/DECO\s*PANEL/i.test(name)) return isCoveringWall(record) ? 'wall' : 'panel';
   if (/^CYL\s+[HV]$/i.test(name) || /^PLAN1$/i.test(name)) return 'fitting';
   if (/^CUBE$/i.test(name)) {
     const ordered = [...dimensions].sort((a,b) => a-b);

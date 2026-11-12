@@ -1,5 +1,6 @@
 import { decodeScn } from './scn-parser.js';
 import { classifyScnRecord, discoverScnRegions } from './scn-layout.js';
+import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -96,7 +97,7 @@ function getModelBounds() {
  const box = new THREE.Box3();
  if(model.userData.nativeScn) {
   for(const mesh of scnRecordMeshes.values()) {
-   if(mesh.visible && mesh.userData.scnRole==='panel') box.expandByObject(mesh);
+   if(mesh.visible && ['panel','wall','reference'].includes(mesh.userData.scnRole)) box.expandByObject(mesh);
   }
  } else box.setFromObject(model);
  return box.isEmpty() ? null : box;
@@ -184,7 +185,7 @@ function toggleEdges(enabled) {
  clearEdges();
  if (!enabled || !model) return;
  model.traverse(obj => {
-  if (!obj.isMesh || !obj.geometry?.attributes?.position || (model.userData.nativeScn && obj.userData.scnRole !== 'panel')) return;
+  if (!obj.isMesh || !obj.geometry?.attributes?.position || (model.userData.nativeScn && !['panel','catalog-part'].includes(obj.userData.scnRole))) return;
   const g = new THREE.EdgesGeometry(obj.geometry, 30);
   const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x132b42, transparent: true, opacity: .65 }));
   obj.add(lines);
@@ -282,23 +283,77 @@ function makeScnMaterials(finish) {
  const metal = new THREE.MeshStandardMaterial({color:0xa9b6bd,roughness:.34,metalness:.55,side:THREE.DoubleSide});
  const reference = new THREE.MeshBasicMaterial({color:0x8ec7d8,transparent:true,opacity:.075,depthWrite:false,side:THREE.DoubleSide});
  const edge = new THREE.LineBasicMaterial({color:0x82bdcb,transparent:true,opacity:.42,depthTest:true,depthWrite:false});
- return {wood, face,side,metal,reference,edge,
+ // A visibly different palette for *schematic* catalog elements. Do not mistake
+ // their panels for real cut-list parts read from the SCN file.
+ const previewBoard = new THREE.MeshStandardMaterial({
+  color:finish==='oak'?0xd6b38d:finish==='white'?0xe7ecea:0x718693,
+  transparent:true,opacity:.94,roughness:.81,side:THREE.DoubleSide,
+ });
+ const previewBack = new THREE.MeshStandardMaterial({
+  color:finish==='oak'?0xb9ae96:finish==='white'?0xc1cfd1:0x536976,
+  roughness:.87,side:THREE.DoubleSide,
+ });
+ const applianceBody = new THREE.MeshStandardMaterial({color:0x8d9aa4,roughness:.39,metalness:.45});
+ const applianceFront = new THREE.MeshStandardMaterial({color:0x2e4354,roughness:.40,metalness:.2});
+ return {wood, face,side,metal,reference,edge,previewBoard,previewBack,applianceBody,applianceFront,
    board:[side,side,face,face,face,face]};
 }
 function applyScnFinish() {
  if (!model?.userData.nativeScn) return;
  const old = scnMaterials;
  scnMaterials = makeScnMaterials($('finishStyle').value);
- for(const mesh of scnRecordMeshes.values()) {
-  const role = mesh.userData.scnRole;
-  mesh.material = role==='panel'?scnMaterials.board:
-    role==='fitting'?scnMaterials.metal:scnMaterials.reference;
+ for (const entry of scnRecordMeshes.values()) {
+  entry.traverse(object => {
+   if (object.isMesh) {
+    const slot = object.userData.scnMaterialType;
+    object.material = slot === 'board' ? scnMaterials.board :
+      slot === 'metal' ? scnMaterials.metal :
+      slot === 'reference' ? scnMaterials.reference :
+      scnMaterials[slot] || scnMaterials.reference;
+   } else if(object.isLineSegments && object.userData.scnOutline) object.material = scnMaterials.edge;
+  });
  }
- if(old) {
-  for(const item of [old.face,old.side,old.metal,old.reference,old.edge,old.wood]) item?.dispose();
+ if (old) {
+  for (const item of [old.face,old.side,old.metal,old.reference,old.edge,old.wood,
+    old.previewBoard,old.previewBack,old.applianceBody,old.applianceFront]) item?.dispose();
  }
  invalidate();
 }
+
+// Only the catalog object's external dimensions are factual. Build an open,
+// labeled illustration of the shell (or equipment), never call its boards real.
+function createCatalogGroup(record, palette) {
+ const preview = makeCatalogPreview(record);
+ const root = new THREE.Group();
+ root.name = `${record.name} – rekonstruált vázlat #${record.id}`;
+ root.userData.scnRole = 'reference';
+ root.userData.scnRecord = record;
+ root.userData.scnPreviewKind = preview.kind;
+ root.userData.cabinetId = record.id;
+ root.userData.cabinetName = `${record.name} (SCN #${record.id})`;
+ root.userData.scnApproximate = true;
+ for (const part of preview.parts) {
+  const partMesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), palette[part.material]);
+  partMesh.scale.set(...part.size);
+  partMesh.position.set(...part.position.map((v,i) => record.position[i] + v + part.size[i]*.5));
+  partMesh.userData.scnRole = 'catalog-part';
+  partMesh.userData.scnMaterialType = part.material;
+  partMesh.userData.scnRecord = record;
+  partMesh.userData.scnApproximate = true;
+  partMesh.userData.partName = `${record.name} #${record.id} – ${part.name}`;
+  root.add(partMesh);
+ }
+ // The outline is especially useful for catalog shapes without reconstructed parts.
+ // Not raycast-selectable: all size selection comes from the original record.
+ if (preview.kind === 'outline') {
+  const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(...record.size)),palette.edge);
+  outline.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
+  outline.userData.scnOutline=true;
+  root.add(outline);
+ }
+ return root;
+}
+
 function buildScnModel(data) {
  const root = new THREE.Group();
  root.name = 'SCN – önálló mérethelyes jelenet';
@@ -329,27 +384,26 @@ function buildScnModel(data) {
  for(const record of data.entries) {
   const role=classifyScnRecord(record);
   if(role==='invalid') continue;
-  const geometry=record.type==='cylinderX'?cylinderX:record.type==='cylinderZ'?cylinderZ:unitBox;
-  const mesh = new THREE.Mesh(geometry,role==='panel'?palette.board:
-    role==='fitting'?palette.metal:palette.reference);
-  mesh.name=`${record.name} #${record.id}`;
-  mesh.scale.set(...record.size);
-  mesh.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
-  mesh.userData.partName = record.name + ` (SCN #${record.id})`;
-  mesh.userData.scnRole=role;
-  mesh.userData.scnRecord=record;
-  mesh.userData.scnApproximate=role!=='panel';
-  const regionId=layout.idToRegion.get(record.id) ?? 0;
-  mesh.userData.scnRegionId=regionId;
-  groups.get(regionId)?.add(mesh);
-  if(role==='reference') {
-   // Named catalog objects get a pale outline instead of an opaque rectangle.
-   // This outline does not claim to reproduce any KitchenDraw geometry.
-   const outline = new THREE.LineSegments(new THREE.EdgesGeometry(unitBox),palette.edge);
-   outline.userData.scnOutline=true;
-   mesh.add(outline);
+  let item;
+  if (role === 'reference') {
+   item = createCatalogGroup(record, palette);
+  } else {
+   const geometry=record.type==='cylinderX'?cylinderX:record.type==='cylinderZ'?cylinderZ:unitBox;
+   item = new THREE.Mesh(geometry, role === 'panel' || role === 'wall' ? palette.board :
+     role === 'fitting' ? palette.metal : palette.reference);
+   item.scale.set(...record.size);
+   item.position.set(...record.position.map((v,i)=>v+record.size[i]/2));
+   item.userData.scnMaterialType=role==='panel'||role==='wall'?'board':role==='fitting'?'metal':'reference';
+   item.userData.partName = record.name + ` (SCN #${record.id})`;
+   item.userData.scnApproximate=role!=='panel' && role!=='wall';
   }
-  meshes.set(record.id,mesh);
+  item.name=`${record.name} #${record.id}`;
+  item.userData.scnRole=role;
+  item.userData.scnRecord=record;
+  const regionId=layout.idToRegion.get(record.id) ?? 0;
+  item.userData.scnRegionId=regionId;
+  groups.get(regionId)?.add(item);
+  meshes.set(record.id,item);
  }
  root.userData.scnState={data,layout,groups,meshes,palette};
  return root;
@@ -358,21 +412,26 @@ function setScnVisible() {
  if (!model?.userData.nativeScn) return;
  const chosen=$('scnArea').value;
  const area = chosen==='all' ? null : Number(chosen);
- let panels=0, references=0;
- for(const mesh of scnRecordMeshes.values()) {
-  const role=mesh.userData.scnRole;
-  const inArea=area===null || mesh.userData.scnRegionId===area;
+ let panels=0, references=0, walls=0;
+ for(const object of scnRecordMeshes.values()) {
+  const role=object.userData.scnRole;
+  const inArea=area===null || object.userData.scnRegionId===area;
   const isVisible=inArea && (role==='panel' ||
+    (role==='wall' && $('showWalls').checked) ||
     (role==='fitting' && $('showFittings').checked) ||
     (role==='reference' && $('showCatalogShapes').checked));
-  // Generic CUBE proxy volumes deliberately stay hidden; even enabling
-  // outlines must not cover assembled panel geometry with massive boxes.
-  mesh.visible=isVisible;
+  // Huge catalog CUBE proxies are never rendered as deceptive solid furniture.
+  object.visible=isVisible;
   if(isVisible && role==='panel') panels++;
   if(isVisible && role==='reference') references++;
+  if(isVisible && role==='wall') walls++;
  }
- if(selectedMesh && !selectedMesh.visible) clearSelection();
- $('visibleScnCount').textContent=`${panels} különálló lap · ${references} referenciakörvonal`;
+ if(selectedMesh) {
+  let visible=true;
+  for(let p=selectedMesh; p && p!==model; p=p.parent) if(!p.visible) { visible=false;break; }
+  if(!visible) clearSelection();
+ }
+ $('visibleScnCount').textContent=`${panels} eredeti lap · ${references} katalógusvázlat · ${walls} takarópanel`;
  boundsCache=new WeakMap();
  partSizeCache=new WeakMap();
  fitView();
@@ -401,7 +460,8 @@ function updateScnItemList() {
    setScnVisible();
    const target=scnRecordMeshes.get(record.id);
    if(!target) return;
-   setSelection(target);
+   const selectable=target.isMesh?target:target.children.find(x=>x.isMesh);
+   if(selectable) setSelection(selectable);
    focusOnObject(target);
   });
   list.append(btn);
@@ -449,8 +509,8 @@ async function openScn(file) {
   setAxis('Z');
   prepareModel(sceneGroup, file.name);
   updateScnExplorer();
-  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. A különálló lapok előtérben; a katalógusobjektumok csak opcionális körvonalak. A pontos gyártói formák hiányozhatnak.`;
-  $('scnInfo').textContent = `${decoded.entries.length} rekord · ${scnLayout.layout.regions.length} elkülönülő szerkezeti terület. A lapok méretei az SCN-ből származnak; csoportosításuk térbeli becslés.`;
+  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. Valós különálló lapok és a katalógusbútorok BECSÜLT, nyitott szerkezeti vázlatai láthatók. A vázlatok nem eredeti alkatrészrajzok.`;
+  $('scnInfo').textContent = `${decoded.entries.length} beolvasott rekord · ${scnLayout.layout.regions.length} elkülönülő terület. A valódi lapok SCN-méretűek; a katalógusobjektumok külméret alapján szerkesztett illusztrációk, nem valódi szabászalkatrészek.`;
   notify(`SCN megnyitva: ${decoded.entries.length} rekord · lapokra bontott nézet.`);
  } catch (error) {
   console.error(error);
@@ -541,24 +601,30 @@ function selectionDetails() {
   const size = getLocalPartSize(selectedMesh);
   const name = selectedMesh.userData?.partName || selectedMesh.name || `Alkatrész ${meshNumbers.get(selectedMesh) || ''}`;
   const kind = model.userData?.nativeScn ?
-    (selectedMesh.userData.scnRole === 'panel' ? 'Különálló szerkezeti lap' : 'Katalógusobjektum (befoglaló)') : 'Alkatrész';
+    (selectedMesh.userData.scnRole === 'panel' ? 'Valódi SCN lap' : selectedMesh.userData.scnRole === 'catalog-part' ? 'Becsült vázlatelem' : 'SCN geometriai elem') : 'Alkatrész';
   return { object: selectedMesh, box: getSelectionBounds(selectedMesh), name,
     size, kind,
     notice: model.userData?.nativeScn ? (selectedMesh.userData.scnRole === 'panel' ?
-     'A méret a fájlban tárolt különálló SCN lapból származik (mm). A pontos elforgatás nem mindig ismert.' :
-     'Ez a méret a KitchenDraw-katalógusra hivatkozó objektum befoglalója, NEM bizonyított alkatrészméret vagy eredeti 3D test.') :
+     'Különálló, SCN-ben tárolt lap (mm). A pontos elforgatás nem mindig ismert.' :
+     selectedMesh.userData.scnRole === 'catalog-part' ?
+     'FIGYELEM: a kiválasztott oldal/tető/polc csupán a katalógusobjektum külső méreteiből becsült 3D vázlatelem! Nem valódi alkatrész vagy szabászméret.' :
+     'Katalógus- vagy geometriai objektum: az eredeti részletek nem garantáltak.') :
      'Az alkatrész saját geometriájának méretei. Több alkatrész összevont 3D hálóját a Viewer nem tudja különválasztani.' };
  }
  const { object, inferred } = findCabinetGroup(selectedMesh);
  let box = getSelectionBounds(object);
+ if(model.userData.nativeScn && object.userData?.scnRole === 'reference') {
+  const rec=object.userData.scnRecord;
+  box=new THREE.Box3(new THREE.Vector3(...rec.position),new THREE.Vector3(...rec.position.map((v,i)=>v+rec.size[i])));
+ }
  if(model.userData.nativeScn && object.userData?.scnRegion) {
   const region=object.userData.scnRegion;
   box = new THREE.Box3(new THREE.Vector3(...region.min), new THREE.Vector3(...region.max));
  }
  const name = inferred ? (object.userData?.cabinetName || object.name || 'SCN objektum') : 'Teljes betöltött modell';
- return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn) ? (object.isMesh ? 'SCN objektum' : 'Bútoregyüttes (becsült)') : 'Szekrény',
+ return { object, box, name, size: box.getSize(new THREE.Vector3()), kind: (model.userData?.nativeScn) ? (object.userData?.scnApproximate ? 'Katalógusbútor – becsült vázlat' : object.isMesh ? 'SCN objektum' : 'Bútoregyüttes (becsült)') : 'Szekrény',
    notice: inferred
-     ? (model.userData?.nativeScn ? 'A látható lapok térbeli csoportjának külső mérete; ez nem bizonyított egyedi KitchenDraw szekrényhatár.' : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
+     ? (model.userData?.nativeScn ? (object.userData?.scnApproximate ? 'A külméret az SCN valódi katalógusobjektum-adatából származik; a megjelenített bútorlapok szerkezete becsült, NEM szabásjegyzék.' : 'A látható lapok térbeli csoportjának külső mérete; ez nem igazolt KitchenDraw szekrényhatár.') : 'A csoport befoglaló külmérete (X × Y × Z); az exportban szereplő elforgatás is befolyásolhatja.')
      : 'A fájl nem tartalmaz felismerhető szekrénycsoportokat: ezért a teljes modell külmérete látható, nem egy külön szekrényé.' };
 }
 function clearSelection() {
@@ -624,7 +690,7 @@ function pickHit(event) {
  // Geometry only, not the grid, axes, measurement markers or selection outline.
  const valid = raycaster.intersectObject(model, true).filter(h => h.object.isMesh && h.object.visible &&
    (!model.userData.nativeScn || h.object.userData.scnRole !== 'proxy'));
- return model.userData.nativeScn ? (valid.find(h=>h.object.userData.scnRole==='panel') || valid[0] || null) : (valid[0] || null);
+ return valid[0] || null; // nearest visible surface; never pick a panel behind the clicked cabinet
 }
 function pickPoint(event) {
  const hit = pickHit(event);
@@ -737,6 +803,7 @@ $('showEdges').addEventListener('change', e => toggleEdges(e.target.checked));
 $('scnArea').addEventListener('change', setScnVisible);
 $('showCatalogShapes').addEventListener('change', setScnVisible);
 $('showFittings').addEventListener('change', setScnVisible);
+$('showWalls').addEventListener('change', setScnVisible);
 $('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
  if (snapPoints.length !== 2) return notify('Előbb jelölj ki két pontot!');

@@ -57,14 +57,14 @@ jobs:
           if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler not found' }
           & $compiler installer/SCN_Viewer.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup error: $LASTEXITCODE" }
-          if (-not (Test-Path 'output/SCN_Viewer_v1.4.0_Telepito.exe')) { throw 'Installer missing' }
+          if (-not (Test-Path 'output/SCN_Viewer_v1.5.0_Telepito.exe')) { throw 'Installer missing' }
           Get-ChildItem output/*.exe | Select-Object Name,Length
 
       - name: EXE telepítő az Artifacts részbe
         uses: actions/upload-artifact@v4
         with:
-          name: SCN_Viewer_v1.4.0_Telepito
-          path: output/SCN_Viewer_v1.4.0_Telepito.exe
+          name: SCN_Viewer_v1.5.0_Telepito
+          path: output/SCN_Viewer_v1.5.0_Telepito.exe
           if-no-files-found: error
           retention-days: 90
           compression-level: 0

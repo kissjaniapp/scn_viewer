@@ -50,10 +50,11 @@
    <div class="form-stack"><label for="scnArea">Melyik bútoregyüttest nézed?</label><select id="scnArea"><option value="all">Összes terület</option></select></div>
    <p id="visibleScnCount" class="stat-pill">–</p>
    <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
-   <label class="check"><input type="checkbox" id="showCatalogShapes"/> Katalógusobjektumok körvonalai</label>
+   <label class="check"><input type="checkbox" id="showCatalogShapes" checked/> Bútorok 3D vázlatai (becsült)</label>
+   <label class="check"><input type="checkbox" id="showWalls"/> Nagy takarófalak és dekorparavánok</label>
    <label class="check"><input type="checkbox" id="showFittings"/> Kisebb szerelvények megjelenítése</label>
-   <p class="hint">A lapok különálló, mérethelyes SCN-rekordok. A bútoregyüttesek térbeli becslések, nem igazolt KitchenDraw szekrényazonosítók. A választható színek saját megjelenítési stílusok.</p>
-   <div class="section-title inner-title">Felismert katalógusobjektumok</div>
+   <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. A nagy dekorparavánokat alapból elrejtjük, hogy lásd a bútorokat.</p>
+   <div class="section-title inner-title">Szekrények és berendezések (név szerint)</div>
    <div id="scnItemList" class="scn-item-list" aria-label="SCN objektumok listája"></div>
   </section>
   <section class="selection-section">
@@ -78,7 +79,7 @@
   </section>
   <section>
    <div class="section-title">Natív SCN-beolvasó</div>
-   <p class="hint">KitchenDraw nem szükséges. A valódi mérettel tárolt dekorlapokat külön jelenítjük meg. A gyártói katalógusok részleteit nem találjuk ki; a nagy befoglaló téglatestek alapból rejtve maradnak.</p>
+   <p class="hint">KitchenDraw nem szükséges. Az eredeti SCN dekorlapokat külön jelenítjük meg. A katalógusobjektumokból nyitott, becsült bútorkonstrukciót vagy berendezéssziluettet rajzolunk a valós külméretben. Ezek a vázlatok nem gyártásra alkalmas alkatrészrajzok.</p>
    <div id="scnInfo" class="hint" aria-live="polite">Válassz egy .scn fájlt a megnyitáshoz.</div>
   </section>
   <section id="manifestSection" hidden>
@@ -90,7 +91,7 @@
  <main class="viewport-wrapper">
   <div id="viewport" aria-label="Forgatható 3D nézet">
    <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div><div class="orbit-help">Jobb gomb: körbeforgatás <span>·</span> Görgő: zoom <span>·</span> Görgő lenyomva: mozgatás</div>
-   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN közvetlen betöltés támogatott; a ténylegesen tárolt lapok külön jelennek meg.</p></div>
+   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN közvetlen betöltés: eredeti lapok + a katalógusbútorok becsült belső vázlatai.</p></div>
    <div id="toast" role="status" aria-live="polite"></div>
   </div>
   <footer><span>Bal: kijelölés / mérés · Jobb: 3D forgatás · Benyomott görgő: mozgatás · Görgő: zoom</span><span id="modelStats">Nincs modell</span></footer>
