@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+KitchenDrawBridge/bin/
+KitchenDrawBridge/obj/
+KitchenDrawBridge/*.dll
+*.scn
+*.obj.tmp
+*.zip
