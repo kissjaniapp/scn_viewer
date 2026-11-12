@@ -15,4 +15,4 @@ assert 'actions/upload-artifact@v4' in workflow
 assert 'bundle: true' in jsbuild
 assert 'CDN' not in jsbuild
 assert (root / 'tools/make_icon.py').is_file()  # Icon is generated during CI
-print('Telepítő forrása és workflow ellenőrizve.')
+print('Installer sources and workflow validated.')
