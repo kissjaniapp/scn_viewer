@@ -32,7 +32,7 @@ async function start() {
   nativeTheme.themeSource = 'dark';
   Menu.setApplicationMenu(null);
   const viewerDir = path.resolve(__dirname, '..', 'dist', 'viewer');
-  const { server, url } = await createLocalServer({ viewerDir });
+  const { server, url } = await createLocalServer({ viewerDir, dataDir: app.getPath('userData') });
   httpServer = server;
   log('SCN Viewer helyi 3D motor indult: ' + url);
   mainWindow = new BrowserWindow({

@@ -54,6 +54,8 @@
    <label class="check"><input type="checkbox" id="showWalls"/> Nagy takarófalak és dekorparavánok</label>
    <label class="check"><input type="checkbox" id="showFittings"/> Kisebb szerelvények megjelenítése</label>
    <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. A nagy dekorparavánokat alapból elrejtjük, hogy lásd a bútorokat.</p>
+   <div class="section-title inner-title">Lehetséges elhelyezési átfedések</div>
+   <div id="scnOverlapList" class="scn-overlap-list hint">A katalógusbútorok helyzetének ellenőrzése…</div>
    <div class="section-title inner-title">Szekrények és berendezések (név szerint)</div>
    <div id="scnItemList" class="scn-item-list" aria-label="SCN objektumok listája"></div>
   </section>
@@ -66,6 +68,18 @@
      <p id="selectedNote" class="hint">Bal kattintással válassz ki egy látható elemet.</p>
    </div>
    <button id="clearSelection" class="full">Kijelölés törlése</button>
+   <div id="positionAdjustSection" class="position-adjust" hidden>
+    <div class="section-title inner-title">Kijelölt SCN objektum helyzetének igazítása</div>
+    <p id="positionSource" class="hint">Eredeti elhelyezés: –</p>
+    <p class="hint">Eltolás a világ X, Y és Z tengelyén, milliméterben. Az SCN-fájlt nem módosítja; a teljes kijelölt szekrényvázlat együtt mozdul.</p>
+    <div class="position-inputs">
+     <label>X (mm)<input id="adjustX" type="number" step="1" min="-30000" max="30000" value="0" /></label>
+     <label>Y (mm)<input id="adjustY" type="number" step="1" min="-30000" max="30000" value="0" /></label>
+     <label>Z (mm)<input id="adjustZ" type="number" step="1" min="-30000" max="30000" value="0" /></label>
+    </div>
+    <div class="row"><button id="applyPosition">Igazítás alkalmazása</button><button id="resetPosition">Eredeti helyzet</button></div>
+    <p id="positionSaveStatus" class="hint"></p>
+   </div>
   </section>
   <section class="measure-section">
    <div class="section-title">Méretezés két pont között</div>

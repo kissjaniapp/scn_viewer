@@ -1,3 +1,25 @@
+# SCN Viewer v1.7.0 – önálló SCN megjelenítő, XYZ igazítással
+
+A program nem használ KitchenDraw-t. Windows 11-es, saját ablakos alkalmazás; a korábbi Tinkercad-jellegű egérforgatás megmaradt.
+
+## Új: bútorpozíciók ellenőrzése és igazítása
+
+A KitchenDraw SCN egyes objektumainak mérete, helye és elforgatása dekódolható, de az egyedi katalógusformák belső geometriája nem mindig található meg a fájlban. Ezért a program **nem mozgat automatikusan, találgatással bútorokat**; a becsült vázlatok helyét szükség esetén ellenőrizheted.
+
+1. Nyisd meg a `.scn` tervet. A „Lehetséges elhelyezési átfedések” listában látható, ha két katalógusbútor *számított befoglaló téglatestje* jelentősen átfedi egymást. Ez figyelmeztetés, **nem igazolt valódi ütközés**.
+2. Bal kattintással jelöld ki az érintett szekrényt/alkatrészt (vagy kattints a katalóguslistájában a nevére).
+3. A „Kijelölt SCN objektum helyzetének igazítása” szakaszban az **X, Y, Z eltolást milliméterben** adhatod meg. Pozitív vagy negatív értékeket is beírhatsz.
+4. Kattints az **Igazítás alkalmazása** gombra. A vázlat minden oldala/teteje/feneke egyszerre mozdul. Az **Eredeti helyzet** gomb mindhárom eltolást nullázza.
+5. A javítások automatikusan megmaradnak ezen a gépen: az alkalmazás saját felhasználói adatkönyvtárában (`scn-positions/<fájlujjlenyomat>.json`). Az eredeti SCN nem módosul, nem kerül a GitHubra.
+
+A szoftver az eredeti SCN-ből kiolvasott pozíciókat alapból megőrzi. Az igazítás kizárólag **a megjelenítésre** vonatkozik, nem gyártásra hitelesített új alkatrészgeometria, és nem új SCN fájl.
+
+## Letöltés és telepítés
+
+A [GitHub Actions – Windows telepítő](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml) legutóbbi sikeres futásánál, az **Artifacts** részből töltsd le a `SCN_Viewer_v1.7.0_Telepito` ZIP-et, majd csomagold ki és indítsd az EXE-t. A korábbi verzióra frissíthető.
+
+---
+
 # SCN Viewer v1.5.0 – látható bútorvázlatok
 
 **KitchenDraw nélkül használható**, önálló Windows 11 alkalmazás, közvetlen `.scn` fájlnyitással, 3D nézettel, alkatrész-/bútorválasztással és milliméteres méréssel.

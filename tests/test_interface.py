@@ -27,4 +27,7 @@ for snippet in (
     "function updateSelectionStats", "addEventListener('change', invalidate)",
 ):
     assert snippet in js, snippet
-print("OK: user controls, pickers, measurement, render-on-demand, IDs")
+for control in ("adjustX", "adjustY", "adjustZ", "applyPosition", "resetPosition", "scnOverlapList", "positionSource"):
+    assert control in page.ids, f"Missing SCN placement interface: {control}"
+assert "correctedPosition" in js and "showScnEnvelopeWarnings" in js
+print("OK: user controls, pickers, measurement, XYZ placement, render-on-demand, IDs")

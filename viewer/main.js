@@ -2,6 +2,7 @@ import { decodeScn } from './scn-parser.js';
 import { classifyScnRecord, discoverScnRegions } from './scn-layout.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
 import { scnWorldBounds } from './scn-transform.js';
+import { correctedPosition, correctedBounds, envelopeWarnings, normaliseAdjustment } from './scn-placement.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -78,6 +79,9 @@ let scnLayout = null;
 let scnRecordMeshes = new Map();
 let scnRegionGroups = new Map();
 let scnMaterials = null;
+let scnFileHash = null;
+let scnCorrections = {};
+let positionSaveFailed = false;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tempVec = new THREE.Vector3();
@@ -221,7 +225,8 @@ function prepareModel(group, name) {
  scnRecordMeshes = native?.meshes || new Map();
  scnRegionGroups = native?.groups || new Map();
  scnMaterials = native?.palette || null;
- if(!native) $('scnExplorer').hidden=true;
+ if(!native) { $('scnExplorer').hidden=true; scnFileHash=null; scnCorrections={}; }
+ refreshPositionPanel();
  originName = name;
  model.traverse(obj => {
   if (!obj.isMesh) return;
@@ -335,7 +340,7 @@ function createCatalogGroup(record, palette) {
  root.userData.scnApproximate = true;
  // Local origin is the source SCN placement point; all parts must inherit the
  // same Z rotation, otherwise a 180-degree cabinet drifts by its full width.
- root.position.set(...record.position);
+ root.position.set(...correctedPosition(record, scnCorrections[record.id]));
  root.rotation.z = record.rotationRad || 0;
  for (const part of preview.parts) {
   const partMesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), palette[part.material]);
@@ -400,7 +405,7 @@ function buildScnModel(data) {
    item = new THREE.Mesh(geometry, role === 'panel' || role === 'wall' ? palette.board :
      role === 'fitting' ? palette.metal : palette.reference);
    item.scale.set(...record.size);
-   item.position.set(...record.position);
+   item.position.set(...correctedPosition(record, scnCorrections[record.id]));
    item.rotation.z = record.rotationRad || 0;
    item.userData.scnMaterialType=role==='panel'||role==='wall'?'board':role==='fitting'?'metal':'reference';
    item.userData.partName = record.name + ` (SCN #${record.id})`;
@@ -441,11 +446,113 @@ function setScnVisible() {
   if(!visible) clearSelection();
  }
  $('visibleScnCount').textContent=`${panels} eredeti lap · ${references} katalógusvázlat · ${walls} takarópanel`;
+ showScnEnvelopeWarnings();
  boundsCache=new WeakMap();
  partSizeCache=new WeakMap();
  fitView();
  updateScnItemList();
  invalidate();
+}
+function selectedScnRecord() {
+ if (!model?.userData.nativeScn || !selectedMesh) return null;
+ const record = selectedMesh.userData.scnRecord;
+ return record && scnRecordMeshes.has(record.id) ? record : null;
+}
+function refreshPositionPanel() {
+ const panel = $('positionAdjustSection');
+ if (!panel) return;
+ const record = selectedScnRecord();
+ panel.hidden = !record;
+ if (!record) return;
+ $('positionSource').textContent = '#' + record.id + ' ' + record.name +
+   ' · eredeti SCN: X ' + record.position[0] + ', Y ' + record.position[1] +
+   ', Z ' + record.position[2] + ' mm';
+ const offset = normaliseAdjustment(scnCorrections[record.id]);
+ for (const [id,i] of [['adjustX',0],['adjustY',1],['adjustZ',2]]) $(id).value = String(offset[i]);
+ $('positionSaveStatus').textContent = positionSaveFailed ?
+  'Figyelem: a pozíció mentése nem sikerült. Az aktuális megjelenítésben alkalmazva van.' :
+  'Csak a Viewer elhelyezését változtatja; az eredeti SCN érintetlen.';
+}
+function showScnEnvelopeWarnings() {
+ const list = $('scnOverlapList');
+ if (!list || !scnLayout) return;
+ const references = scnLayout.data.entries.filter(record => classifyScnRecord(record) === 'reference');
+ const warnings = envelopeWarnings(references, scnCorrections);
+ list.replaceChildren();
+ if (!warnings.length) {
+  list.textContent = 'Nincs kimutatott, jelentős katalógus-befoglaló átfedés. Ez nem bizonyítja, hogy minden tényleges felület különálló.';
+  return;
+ }
+ const head = document.createElement('div');
+ head.textContent = warnings.length + ' lehetséges befoglaló-átfedés az SCN jelenetben (nem igazolt fizikai ütközés):';
+ list.append(head);
+ for (const overlap of warnings.slice(0,12)) {
+  const a = scnLayout.data.entries.find(x => x.id === overlap.a);
+  const b = scnLayout.data.entries.find(x => x.id === overlap.b);
+  const item = document.createElement('div');
+  item.textContent = '#' + overlap.a + ' ' + (a?.name || '') + ' és #' + overlap.b + ' ' +
+    (b?.name || '') + ': X ' + Math.round(overlap.overlapMm[0]) +
+    ', Y ' + Math.round(overlap.overlapMm[1]) + ', Z ' + Math.round(overlap.overlapMm[2]) + ' mm';
+  list.append(item);
+ }
+}
+async function hashScn(buffer) {
+ const digest = await crypto.subtle.digest('SHA-256', buffer);
+ return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function loadScnCorrections(hash) {
+ try {
+  const res = await fetch('/api/placement/' + hash, {cache:'no-store'});
+  if(!res.ok) return {};
+  const parsed = await res.json();
+  if (!parsed.adjustments || typeof parsed.adjustments!=='object' || Array.isArray(parsed.adjustments)) return {};
+  const safe={};
+  for(const [id,value] of Object.entries(parsed.adjustments)) {
+   if(!/^[0-9]{1,6}$/.test(id) || !Array.isArray(value) || value.length !== 3) continue;
+   const actual = normaliseAdjustment(value);
+   if(actual.some(v=>v!==0)) safe[id]=actual;
+  }
+  return safe;
+ } catch { return {}; }
+}
+async function saveScnCorrections() {
+ if(!scnFileHash) return;
+ try {
+  const res=await fetch('/api/placement/' + scnFileHash, {
+   method:'POST', headers:{'Content-Type':'application/json','X-Scn-Viewer':'1'},
+   body:JSON.stringify({adjustments:scnCorrections})
+  });
+  if(!res.ok) throw new Error('Nem sikerült menteni az igazítást.');
+  positionSaveFailed=false;
+ } catch(error) {
+  positionSaveFailed=true;
+  notify('Az igazítás megjelent, de nem sikerült helyben elmenteni.');
+ }
+ refreshPositionPanel();
+}
+function applyPositionAdjustment(offset) {
+ const rec=selectedScnRecord();
+ if(!rec) { notify('Válassz ki előbb egy SCN-objektumot!'); return; }
+ if(!Array.isArray(offset) || offset.length!==3 || offset.some(n=>!Number.isFinite(n) || Math.abs(n)>30000)) {
+  notify('Az X, Y, Z eltolás legyen ±30 000 mm közötti szám.');
+  return;
+ }
+ const delta=normaliseAdjustment(offset);
+ if(delta.every(v=>v===0)) delete scnCorrections[rec.id];
+ else scnCorrections[rec.id]=delta;
+ const object=scnRecordMeshes.get(rec.id);
+ object.position.set(...correctedPosition(rec,delta));
+ model.updateWorldMatrix(true,true);
+ boundsCache=new WeakMap();
+ partSizeCache=new WeakMap();
+ clearMeasure();
+ const current=selectedMesh;
+ if(current) setSelection(current);
+ modelBox=getModelBounds();
+ updateGrid(); updateStats(); showScnEnvelopeWarnings();
+ invalidate();
+ notify('#' + rec.id + ' megjelenítési eltolás: X ' + delta[0] + ', Y ' + delta[1] + ', Z ' + delta[2] + ' mm');
+ void saveScnCorrections();
 }
 function updateScnItemList() {
  const list=$('scnItemList');
@@ -458,7 +565,7 @@ function updateScnItemList() {
  for(const record of entries.slice(0,50)) {
   const btn=document.createElement('button');
   btn.className='scn-item';
-  const label=document.createElement('span');label.textContent=record.name;
+  const label=document.createElement('span');label.textContent='#' + record.id + ' ' + record.name;
   const size=document.createElement('small');size.textContent=record.size.join(' × ')+' mm';
   btn.append(label,size);
   btn.title='Katalógushivatkozás – nem feltétlenül alkatrész vagy önálló szekrény';
@@ -510,7 +617,11 @@ async function openScn(file) {
  try {
   if (file.size > 50 * 1024 * 1024) throw new Error('Legfeljebb 50 MB-os SCN nyitható meg.');
   $('fileHint').textContent = 'SCN bináris objektumadatok feldolgozása…';
-  const decoded = decodeScn(await file.arrayBuffer());
+  const buffer=await file.arrayBuffer();
+  const decoded = decodeScn(buffer);
+  scnFileHash = await hashScn(buffer);
+  scnCorrections = await loadScnCorrections(scnFileHash);
+  positionSaveFailed = false;
   const sceneGroup = buildScnModel(decoded);
   $('upAxis').value = 'Z';
   $('mmPerUnit').value = '1';
@@ -626,12 +737,11 @@ function selectionDetails() {
   const rec=object.userData.scnRecord;
   // The selection outline is world-aligned; the displayed cabinet dimensions
   // below are the original LOCAL dimensions, not the expanded rotated AABB.
-  const bounds = scnWorldBounds(rec);
+  const bounds = correctedBounds(rec, scnCorrections[rec.id]);
   box = new THREE.Box3(new THREE.Vector3(...bounds.min),new THREE.Vector3(...bounds.max));
  }
  if(model.userData.nativeScn && object.userData?.scnRegion) {
-  const region=object.userData.scnRegion;
-  box = new THREE.Box3(new THREE.Vector3(...region.min), new THREE.Vector3(...region.max));
+  box = getSelectionBounds(object); // updated geometry after manual corrections
  }
  const name = inferred ? (object.userData?.cabinetName || object.name || 'SCN objektum') : 'Teljes betöltött modell';
  const original = model.userData.nativeScn && object.userData?.scnRole === 'reference' ? object.userData.scnRecord : null;
@@ -643,6 +753,7 @@ function selectionDetails() {
 }
 function clearSelection() {
  selectedMesh = null;
+ refreshPositionPanel();
  if (selectionBox) {
   scene.remove(selectionBox);
   selectionBox.geometry.dispose();
@@ -675,6 +786,7 @@ function setSelection(mesh) {
  selectionBox.renderOrder = 15;
  scene.add(selectionBox);
  updateSelectionStats();
+ refreshPositionPanel();
  invalidate();
 }
 function refreshSelection() {
@@ -802,6 +914,10 @@ renderer.domElement.addEventListener('pointerup', event => {
 });
 $('selectionType').addEventListener('change', () => { refreshSelection(); toggleMeasure(false); });
 $('clearSelection').addEventListener('click', clearSelection);
+$('applyPosition').addEventListener('click', () => applyPositionAdjustment(
+  ['adjustX','adjustY','adjustZ'].map(id => $(''+id).value.trim()==='' ? NaN : Number($(id).value))
+));
+$('resetPosition').addEventListener('click', () => applyPositionAdjustment([0,0,0]));
 $('fileInput').addEventListener('change', e => { openFiles(e.target.files); e.target.value = ''; });
 $('measureToggle').addEventListener('click', () => toggleMeasure());
 $('resetView').addEventListener('click', fitView);

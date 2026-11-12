@@ -38,3 +38,12 @@ canvas{cursor:pointer}
 .sidebar{background:#17242e}
 #scnExplorer .check{font-size:12px}
 @media(max-width:960px){.orbit-help{max-width:280px;white-space:normal;border-radius:10px;bottom:9px;right:9px}}
+
+/* v1.7 – explicit, non-destructive object placement adjustments */
+#positionAdjustSection[hidden]{display:none!important}
+.position-adjust{margin-top:15px;padding:12px;border:1px solid #37677b;background:#152d3b;border-radius:10px}
+.position-inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
+.position-inputs label{font-size:12px;color:#a8c7d6;display:grid;gap:6px}
+.position-inputs input{min-width:0;width:100%;padding:8px 5px;font-variant-numeric:tabular-nums}
+.scn-overlap-list{border-left:3px solid #b69659;padding:9px 11px;background:#2b302f;border-radius:5px;line-height:1.5}
+.scn-overlap-list div+div{margin-top:6px}

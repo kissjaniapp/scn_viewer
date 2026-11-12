@@ -1,3 +1,15 @@
+# SCN Viewer – változások
+
+## v1.7.0 – X/Y/Z elhelyezési diagnosztika és precíz igazítás
+
+- A v1.6.0 Tinkercad-szerű egérkezelése, SCN szög/forgáspont kezelése, megjelenítése változatlan.
+- A katalógusbútorok becsült befoglaló téglatestei közötti jelentős térbeli átfedések figyelmeztető listája (X, Y, Z mm); ez *nem* állítja, hogy a tényleges alakzatok ütköznek.
+- A kijelölt SCN-objektum **külön X, Y és Z mm eltolt helyzete** állítható. A hozzá tartozó összes becsült alkatrész együtt mozdul; elforgatás és külméret változatlan.
+- Az eredeti SCN-koordináták, méretek és maga a fájl nem változnak. Külön „Eredeti helyzet” gombbal a korrekció visszaállítható.
+- A korrekciókat a Windows felhasználói alkalmazásadat-mappában, fájl-ujjlenyomat szerint tárolja, így a program újraindítása és újratelepítése után is megmaradnak.
+- Az SCN-forrásadatokból nem igazolható bútorelemeken **nincs automatikus eltolás**: a pontos geometria és katalógusadatok nem minden esetben állnak rendelkezésre.
+- Új tesztek: mindhárom tengely mm-es eltolása, a forrásrekordok sértetlensége, átfedésjelzés, biztonságos helyi mentés és visszaolvasás.
+
 # SCN Viewer v1.5.0 – bútorok láthatósága
 
 - A korábban rejtett **34 SCN katalógushivatkozás** megjelenítése alapból: 24 bútorszerű egységhez nyitott, különálló oldalakból/tetőből/fenékből/hátlapból álló **becsült** 3D vázlat, 10 géphez berendezéssziluett készül.
