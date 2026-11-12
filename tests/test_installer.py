@@ -14,5 +14,5 @@ assert 'Upload' in workflow or 'upload-artifact@v4' in workflow
 assert 'actions/upload-artifact@v4' in workflow
 assert 'bundle: true' in jsbuild
 assert 'CDN' not in jsbuild
-assert (root / 'installer/SCNViewer.ico').stat().st_size > 1000
+assert (root / 'tools/make_icon.py').is_file()  # Icon is generated during CI
 print('Telepítő forrása és workflow ellenőrizve.')
