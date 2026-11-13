@@ -95,14 +95,14 @@
    <div class="form-row"><label for="mmPerUnit">1 modell-egység =</label><div class="inline"><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"/><span>mm</span></div></div>
    <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
    <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
-   <label class="check"><input type="checkbox" id="showGrid" checked/> Segédrács</label>
-   <label class="check"><input type="checkbox" id="showEdges" checked/> Lapélek kiemelése</label>
+   <label class="check"><input type="checkbox" id="showGrid"/> Segédrács</label>
+   <label class="check"><input type="checkbox" id="showEdges"/> Lapélek kiemelése</label>
   </section>
 
      <section id="scnExplorer" hidden>
    <div class="section-title">SCN szerkezet és megjelenés</div>
    <p id="visibleScnCount" class="stat-pill">–</p>
-   <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
+   <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white" selected>Matt fehér</option><option value="graphite">Grafit</option></select></div>
    <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. Az összes dekódolt SCN objektum alapból látható; az egyes elemeket a kijelöléssel rejtheted el.</p>
    <div class="section-title inner-title">Lehetséges elhelyezési átfedések</div>
    <div id="scnOverlapList" class="scn-overlap-list hint">A katalógusbútorok helyzetének ellenőrzése…</div>
