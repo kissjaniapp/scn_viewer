@@ -17,53 +17,45 @@
 </head>
 <body>
  <header class="topbar">
-  <div class="logo"><span class="symbol">▣</span><div><strong>SCN Viewer</strong><small>3D modellnézegető · mm-es mérés</small></div></div>
-  <div class="topactions">
-   <label class="file-button primary" for="fileInput">📂 SCN / 3D fájl megnyitása</label>
-   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.mtl,.jpg,.png,.jpeg" multiple hidden/>
-   <button id="resetView" title="Teljes modell mutatása">Nézet középre</button>
-  </div>
+  <div class="brand-line"><span class="symbol">▣</span><strong>SCN Viewer v2.0.0</strong><span class="title-sep">—</span><span id="filename" class="filename">Nincs megnyitott fájl</span></div>
+  <nav class="topactions" aria-label="Fő eszköztár">
+   <label class="file-button primary" for="fileInput">📂 Megnyitás</label>
+   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn" multiple hidden/>
+   <button id="resetView">⤢ Teljes nézet</button>
+   <button id="toggleTree">☷ Szerkezet</button>
+   <button id="measureToolbar">📏 Méretezés</button>
+   <button id="showAllToolbar">◉ Összes mutatása</button>
+   <button id="toggleSettings">⚙ Beállítások</button>
+  </nav>
  </header>
  <div class="app-shell">
- <aside class="sidebar">
-  <section>
-   <div class="section-title">Fájl és megjelenítés</div>
-   <div id="filename" class="filename">Nincs megnyitott fájl</div>
-   <div id="fileHint" class="hint">SCN fájlt közvetlenül, KitchenDraw nélkül olvasunk be. A mért mm-adatok a fájlban tárolt értékek; a katalógusos formák egyszerűsítettek.</div>
-   <div class="form-row"><label for="mmPerUnit">1 modell-egység =</label><div class="inline"><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"/><span>mm</span></div></div>
-   <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
-   <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
-   <label class="check"><input type="checkbox" id="showGrid" checked/> Segédrács</label>
-   <label class="check"><input type="checkbox" id="showEdges" checked/> Lapélek kiemelése</label>
-  </section>
-  <section>
-   <div class="section-title">Nézetek</div>
-   <div class="view-grid">
-    <button data-view="iso" class="selected">3D szabad</button>
-    <button data-view="top">Felülnézet</button>
-    <button data-view="front">Elölnézet</button>
-    <button data-view="right">Oldalnézet</button>
+  <aside class="sidebar structure-sidebar" id="structureSidebar">
+   <div class="panel-header">Szerkezet <span id="treeCount"></span></div>
+   <div class="tree-actions"><button id="expandTree">Mind kinyitása</button><button id="collapseTree">Összecsukás</button></div>
+   <div id="structureTree" class="structure-tree" role="tree" aria-label="SCN szerkezet"><p class="hint">Nyiss meg egy SCN fájlt.</p></div>
+   <div class="tree-notice">A fa az SCN-ből felismerhető objektumokat mutatja. A térbeli csoportok becslések, nem igazolt bútoregységek.</div>
+  </aside>
+  <main class="viewport-wrapper">
+   <div id="viewport" aria-label="Forgatható 3D nézet">
+    <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
+    <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a 3D-modellt, vagy használd a Megnyitás gombot.</p><p class="secondary">A katalógusmodellek részletes geometriája nem minden SCN-fájlban érhető el.</p></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div class="orbit-help">Jobb egér: forgatás · Görgő: nagyítás · Benyomott görgő: mozgatás</div>
+    <div class="axis-label">Z ↑ &nbsp; Y ↗ &nbsp; X →</div>
    </div>
-  </section>
-  <section id="scnExplorer" hidden>
-   <div class="section-title">SCN szerkezet és megjelenés</div>
-   <p id="visibleScnCount" class="stat-pill">–</p>
-   <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
-   <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. Az összes dekódolt SCN objektum alapból látható; az egyes elemeket a kijelöléssel rejtheted el.</p>
-   <div class="section-title inner-title">Lehetséges elhelyezési átfedések</div>
-   <div id="scnOverlapList" class="scn-overlap-list hint">A katalógusbútorok helyzetének ellenőrzése…</div>
-   <div class="section-title inner-title">Szekrények és berendezések (név szerint)</div>
-   <div id="scnItemList" class="scn-item-list" aria-label="SCN objektumok listája"></div>
-  </section>
-  <section class="selection-section">
-   <div class="section-title">Szekrény / alkatrész kijelölése</div>
+   <footer><span id="footerState">Kész</span><span id="modelStats">Nincs modell</span></footer>
+  </main>
+  <aside class="sidebar detail-sidebar">
+   <div class="panel-header">Kijelölt elem</div>
+     <section class="selection-section">
+
    <div class="form-row"><label for="selectionType">Bal kattintással</label><select id="selectionType"><option value="cabinet">Szekrény kijelölése</option><option value="part">Alkatrész kijelölése</option></select></div>
    <div class="selected-card">
      <div class="selection-heading"><small id="selectedKind">–</small><strong id="selectedName">Nincs kijelölve</strong></div>
      <div class="dimension-grid"><div><span>X – szélesség</span><strong id="sizeX">–</strong></div><div><span id="labelSizeY">Y – mélység</span><strong id="sizeY">–</strong></div><div><span id="labelSizeZ">Z – magasság</span><strong id="sizeZ">–</strong></div></div>
      <p id="selectedNote" class="hint">Bal kattintással válassz ki egy látható elemet.</p>
    </div>
-   <button id="hideSelected" class="full" disabled>Kijelölt bútor / alkatrész elrejtése</button>
+   <button id="hideSelected" class="full primary" disabled>Kijelölt bútor / alkatrész elrejtése</button>
    <button id="clearSelection" class="full">Kijelölés törlése</button>
    <div class="section-title inner-title">Elrejtett elemek</div>
    <div id="hiddenObjectsList" class="scn-item-list"><p class="hint">Nincs elrejtett elem.</p></div>
@@ -81,7 +73,42 @@
     <p id="positionSaveStatus" class="hint"></p>
    </div>
   </section>
-  <section class="measure-section">
+
+   <div class="panel-header">Nézet gyorsgombok</div>
+     <section>
+   <div class="section-title">Nézetek</div>
+   <div class="view-grid">
+    <button data-view="iso" class="selected">3D szabad</button>
+    <button data-view="top">Felülnézet</button>
+    <button data-view="front">Elölnézet</button>
+    <button data-view="right">Oldalnézet</button>
+   </div>
+  </section>
+
+   <details class="advanced-panel" id="advancedSettings"><summary>⚙ Megjelenítés és beállítások</summary>
+     <section>
+   <div class="section-title">Fájl és megjelenítés</div>
+
+   <div id="fileHint" class="hint">SCN fájlt közvetlenül, KitchenDraw nélkül olvasunk be. A mért mm-adatok a fájlban tárolt értékek; a katalógusos formák egyszerűsítettek.</div>
+   <div class="form-row"><label for="mmPerUnit">1 modell-egység =</label><div class="inline"><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"/><span>mm</span></div></div>
+   <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
+   <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
+   <label class="check"><input type="checkbox" id="showGrid" checked/> Segédrács</label>
+   <label class="check"><input type="checkbox" id="showEdges" checked/> Lapélek kiemelése</label>
+  </section>
+
+     <section id="scnExplorer" hidden>
+   <div class="section-title">SCN szerkezet és megjelenés</div>
+   <p id="visibleScnCount" class="stat-pill">–</p>
+   <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
+   <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. Az összes dekódolt SCN objektum alapból látható; az egyes elemeket a kijelöléssel rejtheted el.</p>
+   <div class="section-title inner-title">Lehetséges elhelyezési átfedések</div>
+   <div id="scnOverlapList" class="scn-overlap-list hint">A katalógusbútorok helyzetének ellenőrzése…</div>
+   <div class="section-title inner-title">Szekrények és berendezések (név szerint)</div>
+   <div id="scnItemList" class="scn-item-list" aria-label="SCN objektumok listája"></div>
+  </section>
+
+     <section class="measure-section">
    <div class="section-title">Méretezés két pont között</div>
    <button id="measureToggle" class="measure-button">📏 Mérés bekapcsolása</button>
    <div class="hint">Bekapcsolva a bal egérgomb két mérőpontot jelöl ki a szekrényen vagy alkatrészen. A jobb gombbal ilyenkor is forgathatod a nézetet.</div>
@@ -91,25 +118,21 @@
    <div class="row"><button id="undoPoint">Utolsó pont törlése</button><button id="clearMeasure">Mérés törlése</button></div>
    <button id="copyMeasure" class="full">Mérés másolása</button>
   </section>
-  <section>
+
+     <section>
    <div class="section-title">Natív SCN-beolvasó</div>
    <p class="hint">KitchenDraw nem szükséges. Az eredeti SCN dekorlapokat külön jelenítjük meg. A katalógusobjektumokból nyitott, becsült bútorkonstrukciót vagy berendezéssziluettet rajzolunk a valós külméretben. Ezek a vázlatok nem gyártásra alkalmas alkatrészrajzok.</p>
    <div id="scnInfo" class="hint" aria-live="polite">Válassz egy .scn fájlt a megnyitáshoz.</div>
   </section>
-  <section id="manifestSection" hidden>
+
+     <section id="manifestSection" hidden>
    <div id="manifestTitle" class="section-title">SCN elemek</div>
    <p id="manifestNote" class="hint"></p>
    <div id="manifestList" class="manifest-list"></div>
   </section>
- </aside>
- <main class="viewport-wrapper">
-  <div id="viewport" aria-label="Forgatható 3D nézet">
-   <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div><div class="orbit-help">Jobb gomb: körbeforgatás <span>·</span> Görgő: zoom <span>·</span> Görgő lenyomva: mozgatás</div>
-   <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a modellt, vagy használd a „3D fájl megnyitása” gombot.</p><p class="secondary">SCN közvetlen betöltés: eredeti lapok + a katalógusbútorok becsült belső vázlatai.</p></div>
-   <div id="toast" role="status" aria-live="polite"></div>
-  </div>
-  <footer><span>Bal: kijelölés / mérés · Jobb: 3D forgatás · Benyomott görgő: mozgatás · Görgő: zoom</span><span id="modelStats">Nincs modell</span></footer>
- </main>
+
+   </details>
+  </aside>
  </div>
  <script type="module" src="./main.js"></script>
 </body>
