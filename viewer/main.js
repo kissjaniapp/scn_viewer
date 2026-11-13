@@ -103,8 +103,11 @@ function getModelBounds() {
  model.updateWorldMatrix(true, true);
  const box = new THREE.Box3();
  if(model.userData.nativeScn) {
-  for(const mesh of scnRecordMeshes.values()) {
-   if(mesh.visible && !hiddenObjects.has(mesh) && !hiddenObjects.has(mesh.parent)) box.expandByObject(mesh);
+  for(const object of scnRecordMeshes.values()) {
+   if(!object.visible || hiddenObjects.has(object) || !object.parent?.visible) continue;
+   object.traverse(mesh => {
+    if(mesh.isMesh && mesh.visible && !hiddenObjects.has(mesh)) box.expandByObject(mesh);
+   });
   }
  } else model.traverse(obj => { if(obj.isMesh && obj.visible && !hiddenObjects.has(obj) && !hiddenObjects.has(obj.parent)) box.expandByObject(obj); });
  return box.isEmpty() ? null : box;
@@ -306,7 +309,9 @@ function makeScnMaterials(finish) {
  });
  const applianceBody = new THREE.MeshStandardMaterial({color:0x8d9aa4,roughness:.39,metalness:.45});
  const applianceFront = new THREE.MeshStandardMaterial({color:0x2e4354,roughness:.40,metalness:.2});
- return {wood, face,side,metal,reference,edge,previewBoard,previewBack,applianceBody,applianceFront,
+ const solid = new THREE.MeshStandardMaterial({color:0xe6e9e7,roughness:.78,side:THREE.DoubleSide});
+ const surface = new THREE.MeshStandardMaterial({color:0xbfcad2,roughness:.85,side:THREE.DoubleSide});
+ return {wood, face,side,metal,reference,edge,previewBoard,previewBack,applianceBody,applianceFront,solid,surface,
    board:[side,side,face,face,face,face]};
 }
 function applyScnFinish() {
@@ -326,7 +331,7 @@ function applyScnFinish() {
  }
  if (old) {
   for (const item of [old.face,old.side,old.metal,old.reference,old.edge,old.wood,
-    old.previewBoard,old.previewBack,old.applianceBody,old.applianceFront]) item?.dispose();
+    old.previewBoard,old.previewBack,old.applianceBody,old.applianceFront,old.solid,old.surface]) item?.dispose();
  }
  invalidate();
 }
@@ -398,6 +403,10 @@ function buildScnModel(data) {
  const cylinderZ = new THREE.CylinderGeometry(.5,.5,1,12);
  cylinderZ.rotateX(Math.PI/2);
  cylinderZ.translate(.5,.5,.5);
+ const rectangle2d = new THREE.PlaneGeometry(1,1);
+ rectangle2d.translate(.5,.5,0);
+ const circle2d = new THREE.CircleGeometry(.5,32);
+ circle2d.translate(.5,.5,0);
  const palette=makeScnMaterials($('finishStyle').value);
  for(const record of data.entries) {
   const role=classifyScnRecord(record);
@@ -406,15 +415,17 @@ function buildScnModel(data) {
   if (role === 'reference') {
    item = createCatalogGroup(record, palette);
   } else {
-   const geometry=record.type==='cylinderX'?cylinderX:record.type==='cylinderZ'?cylinderZ:unitBox;
-   item = new THREE.Mesh(geometry, role === 'panel' || role === 'wall' ? palette.board :
-     role === 'fitting' ? palette.metal : palette.reference);
+   const geometry=record.type==='cylinderX'?cylinderX:record.type==='cylinderZ'?cylinderZ:
+     record.type==='plane2d'?rectangle2d:record.type==='circle2d'?circle2d:unitBox;
+   const materialType=role==='panel'||role==='wall'?'board':
+     role==='solid'?'solid':role==='surface'?'surface':role==='fitting'?'metal':'reference';
+   item = new THREE.Mesh(geometry, materialType==='board'?palette.board:palette[materialType]);
    item.scale.set(...record.size);
    item.position.set(...correctedPosition(record, scnCorrections[record.id]));
    item.rotation.z = record.rotationRad || 0;
-   item.userData.scnMaterialType=role==='panel'||role==='wall'?'board':role==='fitting'?'metal':'reference';
+   item.userData.scnMaterialType=materialType;
    item.userData.partName = record.name + ` (SCN #${record.id})`;
-   item.userData.scnApproximate=role!=='panel' && role!=='wall';
+   item.userData.scnApproximate=!['panel','wall','solid','surface'].includes(role);
   }
   item.name=`${record.name} #${record.id}`;
   item.userData.scnRole=role;
@@ -435,7 +446,7 @@ function setScnVisible({refit = true} = {}) {
   const role=object.userData.scnRole;
   object.visible=!hiddenObjects.has(object) && !hiddenObjects.has(object.parent);
   object.traverse(part=>{if(part!==object) part.visible=!hiddenObjects.has(part);});
-  if(object.visible && role==='panel') panels++;
+  if(object.visible && (role==='panel'||role==='solid'||role==='surface')) panels++;
   if(object.visible && role==='reference') references++;
   if(object.visible && role==='wall') walls++;
  }
@@ -444,7 +455,7 @@ function setScnVisible({refit = true} = {}) {
   for(let p=selectedMesh; p && p!==model; p=p.parent) if(!p.visible) {visible=false;break;}
   if(!visible) clearSelection();
  }
- $('visibleScnCount').textContent=`${panels} lap · ${references} katalógusobjektum · ${walls} takarópanel · teljes rajztér`;
+ $('visibleScnCount').textContent=`${panels} lap / szilárdtest / 2D sík · ${references} katalógusvázlat · ${walls} takarópanel · teljes rajztér`;
  showScnEnvelopeWarnings();
  boundsCache=new WeakMap();
  partSizeCache=new WeakMap();
