@@ -1,4 +1,10 @@
-# SCN Viewer v1.8.1 – teljes jelenet és elemenkénti elrejtés
+# SCN Viewer v2.0.0 – új CAD felület
+
+Háromoszlopos sötét munkafelület: bal oldalt a teljes importált objektumfa láthatósági jelölőnégyzetekkel, középen nagy 3D nézet, jobb oldalt kijelölés, méretek, elrejtés/visszaállítás, nézet gyorsgombok és lenyitható speciális beállítások. Megmarad a korábbi egérvezérlés és a teljes betöltött jelenet. Az SCN-ben ténylegesen nem rendelkezésre álló KitchenDraw katalógusmodelleket ez a változat sem tudja rekonstruálni; az előző látványkép csak felület- és látványterv, nem a bináris SCN-ből visszafejtett hiteles modell. A szerkezeti fa térbeli jelenetrészei becsült csoportok, nem eredeti szekrényazonosítók.
+
+---
+
+# SCN Viewer v2.0.0 – teljes jelenet és elemenkénti elrejtés
 
 Az összes sikeresen dekódolt SCN objektum és jelenetrész automatikusan látszik: nincs többé jelenetrész-választó, sem kategóriánkénti elrejtés. Szekrény/alkatrész kijelölés után a **Kijelölt bútor / alkatrész elrejtése** gombbal az adott objektum vagy csoport elrejthető, az **Elrejtett elemek** listából egyenként vagy egyszerre visszakapcsolható. A csoportok térbeli becslések, nem garantált KitchenDraw szekrényhierarchia. Az eredeti SCN fájl nem módosul. A katalógusgeometriák továbbra is egyszerűsített vázlatok.
 
