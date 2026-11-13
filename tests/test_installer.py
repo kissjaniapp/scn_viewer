@@ -26,7 +26,7 @@ assert 'nodeIntegration: false' in desktop and 'contextIsolation: true' in deskt
 assert 'server.listen(0' in server  # no fixed port conflicts
 assert '127.0.0.1' in server
 assert 'upload-artifact@v4' in workflow
-assert 'SCN_Viewer_v1.8.0_Telepito' in workflow
+assert 'SCN_Viewer_v1.8.1_Telepito' in workflow
 assert 'bundle: true' in jsbuild
 assert (root / 'tools/make_icon.py').is_file()
 print('Desktop installer sources validated.')
