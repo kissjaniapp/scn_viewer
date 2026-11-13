@@ -59,11 +59,15 @@ export function decodeScn(buffer) {
     }
     const dimensions = [76, 82, 88].map(offset => view.getUint16(i + offset, true));
     const position = [108, 114, 120].map(offset => view.getInt16(i + offset, true));
-    if (dimensions.some(v => v < 1 || v > 32000)) {
+    const name = stringAt(bytes, i + 16, i + 48) || `${catalog} objektum`;
+    // Explicit 2D primitives have a genuine zero Z extent in this SCN variant.
+    // Keep their true dimensions and draw a separate XY surface in the viewer.
+    const planar = /^(?:SURF2D|CIRC322D)$/i.test(name);
+    if (dimensions.some(v => v > 32000) || dimensions[0] === 0 || dimensions[1] === 0 ||
+        (dimensions[2] === 0 && !planar)) {
       unsupported++;
       continue;
     }
-    const name = stringAt(bytes, i + 16, i + 48) || `${catalog} objektum`;
     const rotationRad = view.getFloat64(i + 164, true);
     if (!Number.isFinite(rotationRad) || Math.abs(rotationRad) > 200 * Math.PI) {
       unsupported++;
@@ -76,7 +80,8 @@ export function decodeScn(buffer) {
       size: dimensions,
       position,
       rotationRad,
-      type: /^CYL H$/i.test(name) ? 'cylinderX' : /^CYL V$/i.test(name) ? 'cylinderZ' : 'box',
+      type: /^SURF2D$/i.test(name) ? 'plane2d' : /^CIRC322D$/i.test(name) ? 'circle2d' :
+        /^CYL H$/i.test(name) ? 'cylinderX' : /^CYL V$/i.test(name) ? 'cylinderZ' : 'box',
       offset: i,
     });
     i += 260; // avoid matching text inside the same verified record
@@ -98,6 +103,6 @@ export function decodeScn(buffer) {
     unsupported,
     boundsMm: {min, max, size: max.map((v, i) => v - min[i])},
     fidelity: 'bounding-geometry',
-    note: 'A tárolt méretek, pozíciók és Z-elforgatások valós SCN-adatok; a katalógusfüggő alakzatok egyszerűsített befoglaló testek.'
+    note: 'A tárolt méretek, pozíciók és Z-elforgatások valós SCN-adatok; a 2D felületek külön síkok. A katalógusfüggő alakzatok egyszerűsített befoglaló testek.'
   };
 }
