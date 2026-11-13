@@ -1,5 +1,5 @@
 #define MyAppName "SCN Viewer"
-#define MyAppVersion "1.8.1"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "kissjaniapp"
 #define MyAppURL "https://github.com/kissjaniapp/scn_viewer"
 
