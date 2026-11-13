@@ -30,6 +30,15 @@ const second = testRecord({catalog:'@DK02',name:'PANEL', size:[800,18,720],posit
 const joined = decodeScn(Buffer.concat([testRecord(),second]));
 assert.equal(joined.entries.length, 2);
 assert.deepEqual(joined.entries[1].size, [800,18,720]);
+const plane = decodeScn(testRecord({name:'SURF2D',size:[470,1180,0]}));
+assert.equal(plane.entries.length,1);
+assert.equal(plane.entries[0].type,'plane2d');
+assert.deepEqual(plane.boundsMm.size,[470,1180,0]);
+const circle = decodeScn(testRecord({name:'CIRC322D',size:[150,150,0]}));
+assert.equal(circle.entries[0].type,'circle2d');
+assert.equal(circle.entries[0].size[2],0);
+const invalidZero = testRecord({name:'CUBE',size:[600,400,0]});
+assert.throws(()=>decodeScn(invalidZero),/Nem találtam/);
 const invalid = testRecord(); invalid.writeUInt16LE(0,74);
 assert.throws(() => decodeScn(invalid), /Nem találtam/);
 // Optional offline regression against user's own private SCN.
