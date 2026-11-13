@@ -2,14 +2,14 @@
   "name": "scn-viewer-desktop",
   "productName": "SCN Viewer",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "main": "desktop/main.cjs",
   "description": "Standalone SCN viewer with CAD navigation, independent SCN parsing and explicit XYZ placement diagnostics",
   "scripts": {
     "build": "node tools/build.mjs",
     "desktop": "npm run build && electron .",
     "package:win": "electron-builder --win --dir --x64",
-    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py && node tests/test_scn_parser.mjs && node tests/test_scn_layout.mjs && node tests/test_navigation.mjs && node tests/test_scn_structure.mjs && node tests/test_scn_three.mjs && node tests/test_scn_placement.mjs"
+    "test": "node --check desktop/main.cjs && node --check desktop/server.cjs && node --test tests/test_server.cjs && node --check viewer/main.js && python tests/test_interface.py && python tests/test_installer.py && node tests/test_scn_parser.mjs && node tests/test_scn_layout.mjs && node tests/test_scn_scenes.mjs && node tests/test_navigation.mjs && node tests/test_scn_structure.mjs && node tests/test_scn_three.mjs && node tests/test_scn_placement.mjs"
   },
   "dependencies": {
     "three": "0.170.0"
