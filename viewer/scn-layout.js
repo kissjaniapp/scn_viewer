@@ -9,15 +9,22 @@ import { scnWorldBounds, scnWorldCenter } from './scn-transform.js';
 export function classifyScnRecord(record) {
   const name = String(record.name || '').normalize('NFC');
   const dimensions = record.size || [];
-  if (!Array.isArray(dimensions) || dimensions.length !== 3 || dimensions.some(n => !Number.isFinite(n) || n <= 0)) return 'invalid';
+  if (!Array.isArray(dimensions) || dimensions.length !== 3 || dimensions.some(n => !Number.isFinite(n) || n < 0) || dimensions[0] === 0 || dimensions[1] === 0) return 'invalid';
+  // These serialized types are explicit elementary geometry, NOT catalog envelopes.
+  if (record.type === 'plane2d' || record.type === 'circle2d' ||
+      /^(?:SURF2D|CIRC322D)$/i.test(name)) return dimensions[2] === 0 ? 'surface' : 'invalid';
+  if (dimensions[2] === 0) return 'invalid';
   if (/DECO\s*PANEL/i.test(name)) return isCoveringWall(record) ? 'wall' : 'panel';
   if (/^CYL\s+[HV]$/i.test(name) || /^PLAN1$/i.test(name)) return 'fitting';
   if (/^CUBE$/i.test(name)) {
-    const ordered = [...dimensions].sort((a,b) => a-b);
-    // Thin CUBE records may themselves be structural plates: retain them.
-    if (ordered[0] <= 60 && ordered[1] >= 125 && ordered[2] >= 200) return 'panel';
-    if (ordered[2] < 350 || ordered[1] < 125) return 'fitting';
-    return 'proxy';
+    // CUBE is explicitly a primitive box, including large cabinets and small blocks.
+    // Don't reduce it to a ghost envelope or infer interior shelves.
+    return 'solid';
+  }
+  if (/^S[íi]k\s*\((?:tex|szin)\)$/i.test(name)) {
+    // Stored rectangular solid/coloured surfaces. Render source dimensions,
+    // never substitute a guessed cabinet carcass.
+    return 'solid';
   }
   // Named appliances and catalog assemblies are reference envelopes, not
   // evidence of an actual solid rectangular body.
