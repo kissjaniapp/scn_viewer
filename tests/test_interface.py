@@ -29,5 +29,8 @@ for snippet in (
     assert snippet in js, snippet
 for control in ("adjustX", "adjustY", "adjustZ", "applyPosition", "resetPosition", "scnOverlapList", "positionSource"):
     assert control in page.ids, f"Missing SCN placement interface: {control}"
+assert "scnArea" not in page.ids
+assert "hideSelected" in page.ids and "hiddenObjectsList" in page.ids and "showAllObjects" in page.ids
+assert "function hideSelectedObject" in js and "function refreshHiddenObjects" in js
 assert "correctedPosition" in js and "showScnEnvelopeWarnings" in js
 print("OK: user controls, pickers, measurement, XYZ placement, render-on-demand, IDs")
