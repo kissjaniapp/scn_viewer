@@ -47,13 +47,9 @@
   </section>
   <section id="scnExplorer" hidden>
    <div class="section-title">SCN szerkezet és megjelenés</div>
-   <div class="form-stack"><label for="scnArea">Melyik bútoregyüttest nézed?</label><select id="scnArea"><option value="all">Összes terület</option></select></div>
    <p id="visibleScnCount" class="stat-pill">–</p>
    <div class="form-stack"><label for="finishStyle">Saját anyagmegjelenítés</label><select id="finishStyle"><option value="oak">Világos tölgy – finom faerezet</option><option value="white">Matt fehér</option><option value="graphite">Grafit</option></select></div>
-   <label class="check"><input type="checkbox" id="showCatalogShapes" checked/> Bútorok 3D vázlatai (becsült)</label>
-   <label class="check"><input type="checkbox" id="showWalls"/> Nagy takarófalak és dekorparavánok</label>
-   <label class="check"><input type="checkbox" id="showFittings"/> Kisebb szerelvények megjelenítése</label>
-   <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. A nagy dekorparavánokat alapból elrejtjük, hogy lásd a bútorokat.</p>
+   <p class="hint">Az eredeti SCN lapok méretadatait megőrizzük. A katalógusbútorok belsejének oldal-, tető-, fenék- és polclapjai csak BECSÜLT 3D illusztrációk, nem tényleges gyártási alkatrészek. Az összes dekódolt SCN objektum alapból látható; az egyes elemeket a kijelöléssel rejtheted el.</p>
    <div class="section-title inner-title">Lehetséges elhelyezési átfedések</div>
    <div id="scnOverlapList" class="scn-overlap-list hint">A katalógusbútorok helyzetének ellenőrzése…</div>
    <div class="section-title inner-title">Szekrények és berendezések (név szerint)</div>
@@ -67,7 +63,11 @@
      <div class="dimension-grid"><div><span>X – szélesség</span><strong id="sizeX">–</strong></div><div><span id="labelSizeY">Y – mélység</span><strong id="sizeY">–</strong></div><div><span id="labelSizeZ">Z – magasság</span><strong id="sizeZ">–</strong></div></div>
      <p id="selectedNote" class="hint">Bal kattintással válassz ki egy látható elemet.</p>
    </div>
+   <button id="hideSelected" class="full" disabled>Kijelölt bútor / alkatrész elrejtése</button>
    <button id="clearSelection" class="full">Kijelölés törlése</button>
+   <div class="section-title inner-title">Elrejtett elemek</div>
+   <div id="hiddenObjectsList" class="scn-item-list"><p class="hint">Nincs elrejtett elem.</p></div>
+   <button id="showAllObjects" class="full" disabled>Összes elrejtett visszakapcsolása</button>
    <div id="positionAdjustSection" class="position-adjust" hidden>
     <div class="section-title inner-title">Kijelölt SCN objektum helyzetének igazítása</div>
     <p id="positionSource" class="hint">Eredeti elhelyezés: –</p>
