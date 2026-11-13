@@ -171,9 +171,9 @@ function setView(type) {
  const size = modelBox ? modelBox.getSize(new THREE.Vector3()).length() : 1000;
  const dist = Math.max(size * 1.25, 10);
  const vec = upAxis === 'Z' ? {
-  iso: [1, -1.45, .95], top: [0, .0001, 1], front: [0, -1, .0001], right: [1, 0, .0001]
+  iso: [1, -1.45, .95], top: [0, .0001, 1], bottom: [0, -.0001, -1], front: [0, -1, .0001], back: [0, 1, .0001], right: [1, 0, .0001]
  } : {
-  iso: [1, .95, 1.45], top: [0, 1, .0001], front: [0, .0001, 1], right: [1, .0001, 0]
+  iso: [1, .95, 1.45], top: [0, 1, .0001], bottom: [0, -1, -.0001], front: [0, .0001, 1], back: [0, .0001, -1], right: [1, .0001, 0]
  };
  const dir = new THREE.Vector3(...vec[type]).normalize();
  camera.position.copy(target).addScaledVector(dir, dist);
@@ -181,7 +181,7 @@ function setView(type) {
  controls.update();
  for (const button of document.querySelectorAll('[data-view]')) button.classList.toggle('selected', button.dataset.view === type);
  invalidate();
- $('coordStatus').textContent = type === 'iso' ? '3D nézet' : ({top:'Felülnézet', front:'Elölnézet', right:'Oldalnézet'})[type];
+ $('coordStatus').textContent = type === 'iso' ? '3D nézet' : ({top:'Felülnézet', bottom:'Alulnézet', front:'Elölnézet', back:'Hátulnézet', right:'Oldalnézet'})[type];
 }
 function clearEdges() {
  for (const edge of modelEdges) { edge.parent?.remove(edge); edge.geometry.dispose(); edge.material.dispose(); }
@@ -227,6 +227,7 @@ function prepareModel(group, name) {
  hiddenObjects.clear();
  refreshHiddenObjects();
  scnRecordMeshes = native?.meshes || new Map();
+ renderStructureTree();
  scnRegionGroups = native?.groups || new Map();
  scnMaterials = native?.palette || null;
  if(!native) { $('scnExplorer').hidden=true; scnFileHash=null; scnCorrections={}; }
@@ -429,9 +430,11 @@ function buildScnModel(data) {
 function setScnVisible({refit = true} = {}) {
  if (!model?.userData.nativeScn) return;
  let panels=0, references=0, walls=0;
+ for(const group of scnRegionGroups.values()) group.visible=!hiddenObjects.has(group);
  for(const object of scnRecordMeshes.values()) {
   const role=object.userData.scnRole;
   object.visible=!hiddenObjects.has(object) && !hiddenObjects.has(object.parent);
+  object.traverse(part=>{if(part!==object) part.visible=!hiddenObjects.has(part);});
   if(object.visible && role==='panel') panels++;
   if(object.visible && role==='reference') references++;
   if(object.visible && role==='wall') walls++;
@@ -448,6 +451,7 @@ function setScnVisible({refit = true} = {}) {
  if(refit) fitView();
  else {modelBox=getModelBounds(); updateGrid(); updateStats();}
  updateScnItemList();
+ renderStructureTree();
  invalidate();
 }
 function refreshHiddenObjects() {
@@ -483,6 +487,7 @@ function hideSelectedObject() {
  if(model.userData.nativeScn) setScnVisible({refit:false});
  else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
  refreshHiddenObjects();
+ renderStructureTree();
  notify('Elrejtve: '+(object.userData?.cabinetName||object.userData?.partName||object.name));
 }
 function selectedScnRecord() {
@@ -585,6 +590,57 @@ function applyPositionAdjustment(offset) {
  invalidate();
  notify('#' + rec.id + ' megjelenítési eltolás: X ' + delta[0] + ', Y ' + delta[1] + ', Z ' + delta[2] + ' mm');
  void saveScnCorrections();
+}
+
+function renderStructureTree() {
+ const area=$('structureTree');
+ if(!area)return;
+ area.replaceChildren();
+ if(!model){$('treeCount').textContent='';area.textContent='Nyiss meg egy 3D fájlt.';return;}
+ let count=0;model.traverse(o=>{if(o.isMesh)count++;});
+ $('treeCount').textContent='('+ (model.userData.nativeScn?scnRecordMeshes.size:count)+' elem)';
+ function node(object,label,children=[]) {
+  const wrapper=document.createElement('div');wrapper.className='tree-node'+(children.length?'':' leaf');
+  const row=document.createElement('div');row.className='tree-row';
+  const toggle=document.createElement('button');toggle.className='tree-caret';toggle.textContent=children.length?'▾':'·';
+  toggle.addEventListener('click',()=>{wrapper.classList.toggle('collapsed');toggle.textContent=wrapper.classList.contains('collapsed')?'▸':'▾';});
+  const checkbox=document.createElement('input');checkbox.type='checkbox';
+  checkbox.checked=object.visible&&!hiddenObjects.has(object);
+  checkbox.setAttribute('aria-label',label+' láthatóság');
+  checkbox.addEventListener('change',()=>{
+   if(checkbox.checked){hiddenObjects.delete(object);object.visible=true;}else{hiddenObjects.add(object);object.visible=false;}
+   if(model.userData.nativeScn)setScnVisible({refit:false});
+   else {modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();}
+   refreshHiddenObjects();
+  });
+  const labelButton=document.createElement('button');labelButton.className='tree-name';labelButton.textContent=label;labelButton.title=label;
+  labelButton.addEventListener('click',()=>{
+   let mesh=object.isMesh?object:null;
+   if(!mesh)object.traverse(o=>{if(!mesh&&o.isMesh)mesh=o;});
+   if(!mesh)return;
+   if(hiddenObjects.has(object)||!object.visible){hiddenObjects.delete(object);object.visible=true;if(model.userData.nativeScn)setScnVisible({refit:false});refreshHiddenObjects();}
+   setSelection(mesh);focusOnObject(object);
+  });
+  row.append(toggle,checkbox,labelButton);wrapper.append(row);
+  if(children.length){const childList=document.createElement('div');childList.className='tree-children';children.forEach(c=>childList.append(c));wrapper.append(childList);}
+  return wrapper;
+ }
+ if(model.userData.nativeScn) {
+  const branches=[];
+  for(const [regionId,group] of scnRegionGroups){
+   const records=[...scnRecordMeshes.values()].filter(o=>o.userData.scnRegionId===regionId);
+   if(!records.length)continue;
+   const items=records.map(o=>{
+    const sub=o.userData.scnRole==='reference' ? o.children.filter(x=>x.isMesh).map(part=>node(part,part.userData.partName||part.name)):[];
+    return node(o,(o.userData.scnRecord?.name||o.name)+' #'+o.userData.scnRecord?.id,sub);
+   });
+   branches.push(node(group,group.name+' ('+records.length+')',items));
+  }
+  area.append(node(model,'Teljes SCN jelenet',branches));
+ } else {
+  const items=[];model.traverse(o=>{if(o.isMesh)items.push(node(o,o.name||'Alkatrész'));});
+  area.append(node(model,'Teljes 3D modell',items));
+ }
 }
 function updateScnItemList() {
  const list=$('scnItemList');
@@ -934,6 +990,12 @@ renderer.domElement.addEventListener('pointerup', event => {
 });
 $('selectionType').addEventListener('change', () => { refreshSelection(); toggleMeasure(false); });
 $('clearSelection').addEventListener('click', clearSelection);
+$('toggleTree').addEventListener('click', ()=>$('structureSidebar').classList.toggle('mobile-hidden'));
+$('expandTree').addEventListener('click', ()=>document.querySelectorAll('.structure-tree .tree-node').forEach(n=>n.classList.remove('collapsed')));
+$('collapseTree').addEventListener('click', ()=>document.querySelectorAll('.structure-tree .tree-node').forEach(n=>n.classList.add('collapsed')));
+$('measureToolbar').addEventListener('click', ()=>toggleMeasure());
+$('toggleSettings').addEventListener('click', ()=>{$('advancedSettings').open=!$('advancedSettings').open;});
+$('showAllToolbar').addEventListener('click', ()=>{$('showAllObjects').click();});
 $('hideSelected').addEventListener('click', hideSelectedObject);
 $('showAllObjects').addEventListener('click', () => {
  for(const object of hiddenObjects) object.visible=true;
