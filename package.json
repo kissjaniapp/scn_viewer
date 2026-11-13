@@ -2,7 +2,7 @@
   "name": "scn-viewer-desktop",
   "productName": "SCN Viewer",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.8.1",
   "main": "desktop/main.cjs",
   "description": "Standalone SCN viewer with CAD navigation, independent SCN parsing and explicit XYZ placement diagnostics",
   "scripts": {
