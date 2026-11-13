@@ -6,9 +6,9 @@ const html=readFileSync(new URL('../viewer/index.html',import.meta.url),'utf8');
 assert(js.indexOf('camera.up.set(0, 0, 1)') < js.indexOf('new OrbitControls(camera, renderer.domElement)'), 'Z-up MUST be set before constructing OrbitControls');
 assert(js.includes('function rebuildControls()') && js.includes('controls.dispose()'), 'Controls must be reconstructed on axis changes');
 for(const value of ['controls.rotateSpeed = .65','MIDDLE: THREE.MOUSE.PAN','RIGHT: THREE.MOUSE.ROTATE','LEFT: null','controls.minPolarAngle','controls.maxPolarAngle']) assert(js.includes(value),value);
-for(const id of ['scnArea','scnExplorer','showCatalogShapes','showFittings','finishStyle','scnItemList','showWalls']) assert(html.includes(`id="${id}"`),id);
+for(const id of ['scnExplorer','finishStyle','scnItemList','hideSelected','hiddenObjectsList','showAllObjects']) assert(html.includes(`id="${id}"`),id);
 assert(js.includes("role==='panel'"), 'Independent panel geometry is required');
-console.log('OK: stable CAD orbit, separate panel drawing, area selector and finishes');
+console.log('OK: stable CAD orbit, separate panel drawing, full-scene visibility, hide/restore and finishes');
 
 // Regression: source SCN rotation is applied to the original placement pivot
 // and shared by all reconstructed cabinet parts (never rotated about centres).
