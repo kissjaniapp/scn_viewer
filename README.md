@@ -1,3 +1,13 @@
+# SCN Viewer v1.8.0 – különálló SCN jelenetrészek
+
+A 678A33CD_0368_08.scn vizsgálata több, egymástól távoli ismételt bútor-elrendezést mutatott a fájl koordinátaterében. A Viewer most a közeli objektumokat önálló jelenetrészekbe csoportosítja, és megnyitáskor a legsűrűbb jelenetrészre közelít. Az összes jelenetrész továbbra is választható. A katalógusokból becsült drótvázas/helyettesítő 3D alakzatokat alapból elrejti; ezek külön bekapcsolhatók. Az eredeti SCN objektumpozíciók, méretek és a forgatások nem változnak.
+
+**Korlát:** Ez a verzió nem állít elő KitchenDraw katalógusmodellt a fájlban nem szereplő geometriából, és nem rekonstruálja automatikusan a teljes, falakkal és berendezésekkel ellátott fotorealisztikus irodai látványtervet. A jelenetrészek térbeli csoportosítások, nem hiteles KitchenDraw bútorhierarchia. A csatolt SCN-fájlt nem tettük közzé.
+
+Telepítő: [Windows Actions / Artifacts](https://github.com/kissjaniapp/scn_viewer/actions/workflows/windows-installer.yml) → `SCN_Viewer_v1.8.0_Telepito` (sikeres futás után).
+
+---
+
 # SCN Viewer v1.7.0 – önálló SCN megjelenítő, XYZ igazítással
 
 A program nem használ KitchenDraw-t. Windows 11-es, saját ablakos alkalmazás; a korábbi Tinkercad-jellegű egérforgatás megmaradt.
