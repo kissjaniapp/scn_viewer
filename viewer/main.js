@@ -83,6 +83,7 @@ let scnMaterials = null;
 let scnFileHash = null;
 let scnCorrections = {};
 let positionSaveFailed = false;
+const hiddenObjects = new Set();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tempVec = new THREE.Vector3();
@@ -103,9 +104,9 @@ function getModelBounds() {
  const box = new THREE.Box3();
  if(model.userData.nativeScn) {
   for(const mesh of scnRecordMeshes.values()) {
-   if(mesh.visible && ['panel','wall','reference'].includes(mesh.userData.scnRole)) box.expandByObject(mesh);
+   if(mesh.visible && !hiddenObjects.has(mesh) && !hiddenObjects.has(mesh.parent)) box.expandByObject(mesh);
   }
- } else box.setFromObject(model);
+ } else model.traverse(obj => { if(obj.isMesh && obj.visible && !hiddenObjects.has(obj) && !hiddenObjects.has(obj.parent)) box.expandByObject(obj); });
  return box.isEmpty() ? null : box;
 }
 function updateStats() {
@@ -223,6 +224,8 @@ function prepareModel(group, name) {
  model = group;
  const native = model.userData.scnState;
  scnLayout = native ? {data:native.data,layout:native.layout} : null;
+ hiddenObjects.clear();
+ refreshHiddenObjects();
  scnRecordMeshes = native?.meshes || new Map();
  scnRegionGroups = native?.groups || new Map();
  scnMaterials = native?.palette || null;
@@ -423,36 +426,64 @@ function buildScnModel(data) {
  root.userData.scnState={data,layout,groups,meshes,palette};
  return root;
 }
-function setScnVisible() {
+function setScnVisible({refit = true} = {}) {
  if (!model?.userData.nativeScn) return;
- const chosen=$('scnArea').value;
- const area = chosen==='all' ? null : Number(chosen);
  let panels=0, references=0, walls=0;
  for(const object of scnRecordMeshes.values()) {
   const role=object.userData.scnRole;
-  const inArea=area===null || object.userData.scnRegionId===area;
-  const isVisible=inArea && (role==='panel' ||
-    (role==='wall' && $('showWalls').checked) ||
-    (role==='fitting' && $('showFittings').checked) ||
-    (role==='reference' && $('showCatalogShapes').checked));
-  // Huge catalog CUBE proxies are never rendered as deceptive solid furniture.
-  object.visible=isVisible;
-  if(isVisible && role==='panel') panels++;
-  if(isVisible && role==='reference') references++;
-  if(isVisible && role==='wall') walls++;
+  object.visible=!hiddenObjects.has(object) && !hiddenObjects.has(object.parent);
+  if(object.visible && role==='panel') panels++;
+  if(object.visible && role==='reference') references++;
+  if(object.visible && role==='wall') walls++;
  }
  if(selectedMesh) {
   let visible=true;
-  for(let p=selectedMesh; p && p!==model; p=p.parent) if(!p.visible) { visible=false;break; }
+  for(let p=selectedMesh; p && p!==model; p=p.parent) if(!p.visible) {visible=false;break;}
   if(!visible) clearSelection();
  }
- $('visibleScnCount').textContent=`${panels} eredeti lap · ${references} katalógusvázlat · ${walls} takarópanel`;
+ $('visibleScnCount').textContent=`${panels} lap · ${references} katalógusobjektum · ${walls} takarópanel · teljes rajztér`;
  showScnEnvelopeWarnings();
  boundsCache=new WeakMap();
  partSizeCache=new WeakMap();
- fitView();
+ if(refit) fitView();
+ else {modelBox=getModelBounds(); updateGrid(); updateStats();}
  updateScnItemList();
  invalidate();
+}
+function refreshHiddenObjects() {
+ const list=$('hiddenObjectsList');
+ if(!list) return;
+ list.replaceChildren();
+ $('showAllObjects').disabled=hiddenObjects.size===0;
+ if(!hiddenObjects.size) {
+  const hint=document.createElement('p');
+  hint.className='hint'; hint.textContent='Nincs elrejtett elem.';
+  list.append(hint); return;
+ }
+ for(const object of hiddenObjects) {
+  const button=document.createElement('button');
+  button.className='scn-item';
+  button.textContent='👁 Visszakapcsolás: '+(object.userData?.cabinetName||object.userData?.partName||object.name||'Objektum');
+  button.addEventListener('click',()=>{
+   hiddenObjects.delete(object); object.visible=true;
+   if(model?.userData.nativeScn) setScnVisible({refit:false});
+   else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+   refreshHiddenObjects();
+  });
+  list.append(button);
+ }
+}
+function hideSelectedObject() {
+ if(!selectedMesh || !model) return;
+ const details=selectionDetails();
+ if(!details?.object || details.object===model) return notify('Válassz ki egy külön bútort vagy alkatrészt!');
+ const object=details.object;
+ hiddenObjects.add(object); object.visible=false;
+ clearSelection();
+ if(model.userData.nativeScn) setScnVisible({refit:false});
+ else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+ refreshHiddenObjects();
+ notify('Elrejtve: '+(object.userData?.cabinetName||object.userData?.partName||object.name));
 }
 function selectedScnRecord() {
  if (!model?.userData.nativeScn || !selectedMesh) return null;
@@ -559,32 +590,26 @@ function updateScnItemList() {
  const list=$('scnItemList');
  list.replaceChildren();
  if(!model?.userData.nativeScn) return;
- const area=$('scnArea').value;
- const entries=scnLayout.data.entries.filter(record=>
-  classifyScnRecord(record)==='reference' &&
-  (area==='all'||String(scnLayout.layout.idToRegion.get(record.id)??0)===area));
- for(const record of entries.slice(0,50)) {
-  const btn=document.createElement('button');
-  btn.className='scn-item';
-  const label=document.createElement('span');label.textContent='#' + record.id + ' ' + record.name;
+ const entries=scnLayout.data.entries.filter(record=>classifyScnRecord(record)==='reference');
+ for(const record of entries) {
+  const btn=document.createElement('button');btn.className='scn-item';
+  const label=document.createElement('span');label.textContent='#'+record.id+' '+record.name;
   const size=document.createElement('small');size.textContent=record.size.join(' × ')+' mm';
   btn.append(label,size);
-  btn.title='Katalógushivatkozás – nem feltétlenül alkatrész vagy önálló szekrény';
+  btn.title='Katalógushivatkozás; a belső geometria lehet becsült';
   btn.addEventListener('click',()=>{
-   $('showCatalogShapes').checked=true;
-   const areaId=scnLayout.layout.idToRegion.get(record.id)??0;
-   if($('scnArea').value!=='all' && String(areaId)!==$('scnArea').value) $('scnArea').value='all';
-   setScnVisible();
    const target=scnRecordMeshes.get(record.id);
    if(!target) return;
+   if(hiddenObjects.has(target)) {
+    hiddenObjects.delete(target);
+    setScnVisible({refit:false});
+    refreshHiddenObjects();
+   }
    const selectable=target.isMesh?target:target.children.find(x=>x.isMesh);
    if(selectable) setSelection(selectable);
    focusOnObject(target);
   });
   list.append(btn);
- }
- if(entries.length>50) {
-  const note=document.createElement('p'); note.className='hint'; note.textContent=`További ${entries.length-50} bejegyzés nem látható a listában.`;list.append(note);
  }
 }
 function focusOnObject(object) {
@@ -605,13 +630,6 @@ function focusOnObject(object) {
 function updateScnExplorer() {
  if(!scnLayout) return;
  $('scnExplorer').hidden=false;
- const chooser=$('scnArea');
- chooser.replaceChildren();
- for(const [value,label] of [['all','Minden jelenetrész (teljes rajztér)'],...scnLayout.layout.regions.map(z=>[String(z.id),z.label])]) {
-  const option=document.createElement('option');option.value=value;option.textContent=label;chooser.append(option);
- }
- const best=scnLayout.layout.regions.find(x=>x.panelCount>=3);
- chooser.value=best?String(best.id):'all';
  setScnVisible();
 }
 async function openScn(file) {
@@ -624,16 +642,13 @@ async function openScn(file) {
   scnCorrections = await loadScnCorrections(scnFileHash);
   positionSaveFailed = false;
   const sceneGroup = buildScnModel(decoded);
-  // No invented outlines on first open: the real SCN panel solids remain visible.
-  $('showCatalogShapes').checked = false;
-  $('showFittings').checked = false;
   $('upAxis').value = 'Z';
   $('mmPerUnit').value = '1';
   mmPerUnit = 1;
   setAxis('Z');
   prepareModel(sceneGroup, file.name);
   updateScnExplorer();
-  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord, több önálló rajztéri elrendezés. Alapból az egyik jelenetrészt mutatjuk; a többi a választóval elérhető. A katalógusvázlatok külön bekapcsolhatók, és nem gyártási alkatrészek.`;
+  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord, több önálló rajztéri elrendezés. Az összes dekódolt jelenetrész megjelenik; a kijelölt bútor vagy alkatrész külön elrejthető. A katalógusvázlatok nem gyártási alkatrészek.`;
   $('scnInfo').textContent = `${decoded.entries.length} beolvasott rekord · ${scnLayout.layout.regions.length} elkülönülő jelenetrész. A jelenetrészek térbeli csoportosítások, nem KitchenDraw bútorazonosítók. A valódi lapok SCN-méretűek; a katalógusobjektumok külméret alapján szerkesztett illusztrációk, nem valódi szabászalkatrészek.`;
   notify(`SCN megnyitva: ${decoded.entries.length} rekord · lapokra bontott nézet.`);
  } catch (error) {
@@ -770,6 +785,7 @@ function clearSelection() {
 function updateSelectionStats() {
  const details = selectionDetails();
  $('selectedName').textContent = details ? details.name : 'Nincs kijelölve';
+ $('hideSelected').disabled = !details || !details.object || details.object === model;
  $('selectedKind').textContent = details ? details.kind : '–';
  $('selectedNote').textContent = details ? details.notice : 'Bal kattintással válassz ki egy látható elemet.';
  const zUp = upAxis === 'Z';
@@ -918,6 +934,14 @@ renderer.domElement.addEventListener('pointerup', event => {
 });
 $('selectionType').addEventListener('change', () => { refreshSelection(); toggleMeasure(false); });
 $('clearSelection').addEventListener('click', clearSelection);
+$('hideSelected').addEventListener('click', hideSelectedObject);
+$('showAllObjects').addEventListener('click', () => {
+ for(const object of hiddenObjects) object.visible=true;
+ hiddenObjects.clear();
+ if(model?.userData.nativeScn) setScnVisible({refit:false});
+ else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+ refreshHiddenObjects();
+});
 $('applyPosition').addEventListener('click', () => applyPositionAdjustment(
   ['adjustX','adjustY','adjustZ'].map(id => $(''+id).value.trim()==='' ? NaN : Number($(id).value))
 ));
@@ -934,10 +958,6 @@ $('mmPerUnit').addEventListener('input', e => {
 $('upAxis').addEventListener('change', e => { setAxis(e.target.value); updateGrid(); updateSelectionStats(); });
 $('showGrid').addEventListener('change', updateGrid);
 $('showEdges').addEventListener('change', e => toggleEdges(e.target.checked));
-$('scnArea').addEventListener('change', setScnVisible);
-$('showCatalogShapes').addEventListener('change', setScnVisible);
-$('showFittings').addEventListener('change', setScnVisible);
-$('showWalls').addEventListener('change', setScnVisible);
 $('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
  if (snapPoints.length !== 2) return notify('Előbb jelölj ki két pontot!');
