@@ -1,5 +1,6 @@
 import { decodeScn } from './scn-parser.js';
-import { classifyScnRecord, discoverScnRegions } from './scn-layout.js';
+import { classifyScnRecord } from './scn-layout.js';
+import { discoverScnScenes } from './scn-scenes.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
 import { scnWorldBounds } from './scn-transform.js';
 import { correctedPosition, correctedBounds, envelopeWarnings, normaliseAdjustment } from './scn-placement.js';
@@ -368,12 +369,12 @@ function buildScnModel(data) {
  const root = new THREE.Group();
  root.name = 'SCN – önálló mérethelyes jelenet';
  root.userData.nativeScn=true;
- const layout = discoverScnRegions(data.entries);
+ const layout = discoverScnScenes(data.entries);
  const groups = new Map();
  const meshes = new Map();
  for(const region of layout.regions) {
   const group=new THREE.Group();
-  group.name=region.name + ' (térbeli csoport, becslés)';
+  group.name=region.name + ' (SCN térbeli jelenetrész, nem szekrényazonosító)';
   group.userData.scnRegionId=region.id;
   group.userData.scnRegion=region;
   group.userData.cabinetName=group.name;
@@ -606,7 +607,7 @@ function updateScnExplorer() {
  $('scnExplorer').hidden=false;
  const chooser=$('scnArea');
  chooser.replaceChildren();
- for(const [value,label] of [['all','Összes terület'],...scnLayout.layout.regions.map(z=>[String(z.id),z.label])]) {
+ for(const [value,label] of [['all','Minden jelenetrész (teljes rajztér)'],...scnLayout.layout.regions.map(z=>[String(z.id),z.label])]) {
   const option=document.createElement('option');option.value=value;option.textContent=label;chooser.append(option);
  }
  const best=scnLayout.layout.regions.find(x=>x.panelCount>=3);
@@ -623,14 +624,17 @@ async function openScn(file) {
   scnCorrections = await loadScnCorrections(scnFileHash);
   positionSaveFailed = false;
   const sceneGroup = buildScnModel(decoded);
+  // No invented outlines on first open: the real SCN panel solids remain visible.
+  $('showCatalogShapes').checked = false;
+  $('showFittings').checked = false;
   $('upAxis').value = 'Z';
   $('mmPerUnit').value = '1';
   mmPerUnit = 1;
   setAxis('Z');
   prepareModel(sceneGroup, file.name);
   updateScnExplorer();
-  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord. A lapok és becsült bútorvázlatok eredeti koordinátán, az SCN-ben tárolt elforgatással jelennek meg. A vázlatok nem gyártási alkatrészek.`;
-  $('scnInfo').textContent = `${decoded.entries.length} beolvasott rekord · ${scnLayout.layout.regions.length} elkülönülő terület. A valódi lapok SCN-méretűek; a katalógusobjektumok külméret alapján szerkesztett illusztrációk, nem valódi szabászalkatrészek.`;
+  $('fileHint').textContent = `${decoded.entries.length} SCN-rekord, több önálló rajztéri elrendezés. Alapból az egyik jelenetrészt mutatjuk; a többi a választóval elérhető. A katalógusvázlatok külön bekapcsolhatók, és nem gyártási alkatrészek.`;
+  $('scnInfo').textContent = `${decoded.entries.length} beolvasott rekord · ${scnLayout.layout.regions.length} elkülönülő jelenetrész. A jelenetrészek térbeli csoportosítások, nem KitchenDraw bútorazonosítók. A valódi lapok SCN-méretűek; a katalógusobjektumok külméret alapján szerkesztett illusztrációk, nem valódi szabászalkatrészek.`;
   notify(`SCN megnyitva: ${decoded.entries.length} rekord · lapokra bontott nézet.`);
  } catch (error) {
   console.error(error);
