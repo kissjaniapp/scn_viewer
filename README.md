@@ -1,10 +1,18 @@
-# SCN Viewer v2.0.0 – új CAD felület
+# SCN Viewer v2.1.0 – javított SCN geometria (678A33CD_0368_08.scn minta)
+
+Az ellenőrzött mintában 915 dekódolható rekord található: 735 dekorlap, 120 CUBE/Sík jellegű téglatest, 42 nulla magasságú SURF2D/CIRC322D síkidom és 18 további katalógus-/szerelvényrekord. A régi beolvasó a 42 síkidomot kihagyta, a CUBE/Sík elemeket részben félrevezető helyettesítő vázlatként kezelte. A v2.1.0 a 2D síkokat és köröket eredeti méretekkel külön síkgeometriaként, a primitív dobozokat tömör objektumként rajzolja, és a rejtett objektumokat nem számítja bele a látható modell méreteibe. Alapnézet: matt fehér, segédrács és élrajz kikapcsolva (mindkettő visszakapcsolható).
+
+A teljes SCN-jelenet betöltődik, a szerkezeti fa és a bútor/alkatrész elrejtése megmarad. A tömör primitív itt az SCN-ben megadott méretekből épül, nem a pontos, textúrázott katalóguspoligonokból. Az eredeti látványterven szereplő falak, székek és monitorok tökéletes visszaállítása továbbra sem garantált, mert az SCN nem tartalmaz minden szükséges katalógushálót és textúrát. **A belső szerkezetből becsült elemek nem használhatók szabászatra vagy CNC gyártásra.** A személyes SCN-mintát nem tettük közzé.
+
+---
+
+# SCN Viewer v2.1.0 – új CAD felület
 
 Háromoszlopos sötét munkafelület: bal oldalt a teljes importált objektumfa láthatósági jelölőnégyzetekkel, középen nagy 3D nézet, jobb oldalt kijelölés, méretek, elrejtés/visszaállítás, nézet gyorsgombok és lenyitható speciális beállítások. Megmarad a korábbi egérvezérlés és a teljes betöltött jelenet. Az SCN-ben ténylegesen nem rendelkezésre álló KitchenDraw katalógusmodelleket ez a változat sem tudja rekonstruálni; az előző látványkép csak felület- és látványterv, nem a bináris SCN-ből visszafejtett hiteles modell. A szerkezeti fa térbeli jelenetrészei becsült csoportok, nem eredeti szekrényazonosítók.
 
 ---
 
-# SCN Viewer v2.0.0 – teljes jelenet és elemenkénti elrejtés
+# SCN Viewer v2.1.0 – teljes jelenet és elemenkénti elrejtés
 
 Az összes sikeresen dekódolt SCN objektum és jelenetrész automatikusan látszik: nincs többé jelenetrész-választó, sem kategóriánkénti elrejtés. Szekrény/alkatrész kijelölés után a **Kijelölt bútor / alkatrész elrejtése** gombbal az adott objektum vagy csoport elrejthető, az **Elrejtett elemek** listából egyenként vagy egyszerre visszakapcsolható. A csoportok térbeli becslések, nem garantált KitchenDraw szekrényhierarchia. Az eredeti SCN fájl nem módosul. A katalógusgeometriák továbbra is egyszerűsített vázlatok.
 
