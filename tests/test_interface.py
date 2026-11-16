@@ -32,5 +32,7 @@ for control in ("adjustX", "adjustY", "adjustZ", "applyPosition", "resetPosition
 assert "scnArea" not in page.ids
 assert "hideSelected" in page.ids and "hiddenObjectsList" in page.ids and "showAllObjects" in page.ids
 assert "function hideSelectedObject" in js and "function refreshHiddenObjects" in js
+assert ".skp" in (root / "index.html").read_text(encoding="utf-8")
+assert "decodeSkpToGlb" in js
 assert "correctedPosition" in js and "showScnEnvelopeWarnings" in js
 print("OK: user controls, pickers, measurement, XYZ placement, render-on-demand, IDs")
