@@ -1,4 +1,5 @@
 import { decodeScn } from './scn-parser.js';
+import { decodeSkpToGlb } from './skp-loader.js';
 import { classifyScnRecord } from './scn-layout.js';
 import { discoverScnScenes } from './scn-scenes.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
@@ -726,12 +727,30 @@ async function openScn(file) {
 }
 async function openFiles(files) {
  const all = Array.from(files);
- const file = all.find(f => /\.(obj|3ds|stl|glb|gltf|scn)$/i.test(f.name));
- if (!file) return notify('OBJ, 3DS, STL, GLB, GLTF vagy SCN fájlt válassz.');
+ const file = all.find(f => /\.(obj|3ds|stl|glb|gltf|scn|skp)$/i.test(f.name));
+ if (!file) return notify('SCN, SKP, OBJ, 3DS, STL, GLB vagy GLTF fájlt válassz.');
  const extension = file.name.split('.').pop().toLowerCase();
  if (extension === 'scn') { await openScn(file); return; }
  try {
   let result;
+  if (extension === 'skp') {
+   if (file.size > 75 * 1024 * 1024) throw new Error('Az SKP legfeljebb 75 MB lehet a biztonságos helyi feldolgozáshoz.');
+   $('fileHint').textContent = 'SketchUp geometria, komponensek és textúrák feldolgozása…';
+   // OpenSKP returns glTF Y-up geometry in metres. Keep the original
+   // component hierarchy in the generated instanced GLB.
+   const converted = decodeSkpToGlb(await file.arrayBuffer());
+   const gltf = await new Promise((resolve, reject) => new GLTFLoader().parse(converted.glb, '', resolve, reject));
+   result = gltf.scene;
+   if (new THREE.Box3().setFromObject(result).isEmpty()) throw new Error('A beolvasott SketchUp modellben nincs megjeleníthető 3D objektum.');
+   $('upAxis').value = 'Y';
+   $('mmPerUnit').value = '1000'; // OpenSKP/glTF metres -> display millimetres
+   mmPerUnit = 1000;
+   setAxis('Y');
+   prepareModel(result, file.name);
+   $('manifestSection').hidden = true;
+   $('fileHint').textContent = `SketchUp 3D modell · ${converted.resourceCount} egyedi geometriai erőforrás. A méretek mm-ben; a komponenselhelyezések és anyagok az SKP-ből származnak.`;
+   return;
+  }
   if (extension === 'obj') {
    const data = await file.text();
    result = new OBJLoader().parse(data);
@@ -754,7 +773,7 @@ async function openFiles(files) {
   setAxis($('upAxis').value);
   prepareModel(result, file.name);
   $('manifestSection').hidden=true;
- } catch(error) { console.error(error); notify('Nem sikerült megnyitni: ' + (error?.message || String(error))); }
+ } catch(error) { console.error(error); const message='Nem sikerült megnyitni: ' + (error?.message || String(error)); $('fileHint').textContent=message; notify(message); }
 }
 
 // Cabinet/part selection. Part sizes are from the part's local geometry,
