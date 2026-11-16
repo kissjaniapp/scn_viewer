@@ -99,18 +99,25 @@ function notify(message) {
 }
 function format(number, digits = 2) { return Number(number).toLocaleString('hu-HU', { maximumFractionDigits: digits, minimumFractionDigits: digits }); }
 function formatPoint(point) { return point ? [point.x, point.y, point.z].map(v => format(v * mmPerUnit, 1)).join('; ') + ' mm' : 'Nincs'; }
+function isVisibleInHierarchy(object) {
+ for(let item=object; item; item=item.parent) {
+  if(!item.visible || hiddenObjects.has(item)) return false;
+  if(item===model) break;
+ }
+ return true;
+}
 function getModelBounds() {
  if (!model) return null;
  model.updateWorldMatrix(true, true);
  const box = new THREE.Box3();
  if(model.userData.nativeScn) {
   for(const object of scnRecordMeshes.values()) {
-   if(!object.visible || hiddenObjects.has(object) || !object.parent?.visible) continue;
+   if(!isVisibleInHierarchy(object)) continue;
    object.traverse(mesh => {
-    if(mesh.isMesh && mesh.visible && !hiddenObjects.has(mesh)) box.expandByObject(mesh);
+    if(mesh.isMesh && isVisibleInHierarchy(mesh)) box.expandByObject(mesh);
    });
   }
- } else model.traverse(obj => { if(obj.isMesh && obj.visible && !hiddenObjects.has(obj) && !hiddenObjects.has(obj.parent)) box.expandByObject(obj); });
+ } else model.traverse(obj => { if(obj.isMesh && isVisibleInHierarchy(obj)) box.expandByObject(obj); });
  return box.isEmpty() ? null : box;
 }
 function updateStats() {
@@ -650,8 +657,9 @@ function renderStructureTree() {
   }
   area.append(node(model,'Teljes SCN jelenet',branches));
  } else {
-  const items=[];model.traverse(o=>{if(o.isMesh)items.push(node(o,o.name||'Alkatrész'));});
-  area.append(node(model,'Teljes 3D modell',items));
+  const walk = object => node(object,object.name || (object.isMesh?'Alkatrész':'Csoport'),
+    object.children.filter(child=>child.isMesh || child.children.length).map(walk));
+  area.append(node(model,'Teljes 3D modell',model.children.map(walk)));
  }
 }
 function updateScnItemList() {
@@ -741,6 +749,10 @@ async function openFiles(files) {
    const converted = decodeSkpToGlb(await file.arrayBuffer());
    const gltf = await new Promise((resolve, reject) => new GLTFLoader().parse(converted.glb, '', resolve, reject));
    result = gltf.scene;
+   // Every named SketchUp component/group remains a distinct selectable node.
+   result.traverse(object => {
+    if(object !== result && object.isGroup && object.name && object.children.length) object.userData.cabinet = true;
+   });
    if (new THREE.Box3().setFromObject(result).isEmpty()) throw new Error('A beolvasott SketchUp modellben nincs megjeleníthető 3D objektum.');
    $('upAxis').value = 'Y';
    $('mmPerUnit').value = '1000'; // OpenSKP/glTF metres -> display millimetres
@@ -920,7 +932,7 @@ function pickHit(event) {
  mouse.set(px / rect.width * 2 - 1, -(py / rect.height) * 2 + 1);
  raycaster.setFromCamera(mouse, camera);
  // Geometry only, not the grid, axes, measurement markers or selection outline.
- const valid = raycaster.intersectObject(model, true).filter(h => h.object.isMesh && h.object.visible &&
+ const valid = raycaster.intersectObject(model, true).filter(h => h.object.isMesh && isVisibleInHierarchy(h.object) &&
    (!model.userData.nativeScn || h.object.userData.scnRole !== 'proxy'));
  return valid[0] || null; // nearest visible surface; never pick a panel behind the clicked cabinet
 }
@@ -1031,7 +1043,7 @@ $('showAllObjects').addEventListener('click', () => {
  for(const object of hiddenObjects) object.visible=true;
  hiddenObjects.clear();
  if(model?.userData.nativeScn) setScnVisible({refit:false});
- else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+ else {modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();}
  refreshHiddenObjects();
 });
 $('applyPosition').addEventListener('click', () => applyPositionAdjustment(
