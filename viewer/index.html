@@ -20,7 +20,7 @@
   <div class="brand-line"><span class="symbol">▣</span><strong>SCN Viewer v2.0.0</strong><span class="title-sep">—</span><span id="filename" class="filename">Nincs megnyitott fájl</span></div>
   <nav class="topactions" aria-label="Fő eszköztár">
    <label class="file-button primary" for="fileInput">📂 Megnyitás</label>
-   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn" multiple hidden/>
+   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.skp" multiple hidden/>
    <button id="resetView">⤢ Teljes nézet</button>
    <button id="toggleTree">☷ Szerkezet</button>
    <button id="measureToolbar">📏 Méretezés</button>
@@ -32,13 +32,13 @@
   <aside class="sidebar structure-sidebar" id="structureSidebar">
    <div class="panel-header">Szerkezet <span id="treeCount"></span></div>
    <div class="tree-actions"><button id="expandTree">Mind kinyitása</button><button id="collapseTree">Összecsukás</button></div>
-   <div id="structureTree" class="structure-tree" role="tree" aria-label="SCN szerkezet"><p class="hint">Nyiss meg egy SCN fájlt.</p></div>
+   <div id="structureTree" class="structure-tree" role="tree" aria-label="SCN szerkezet"><p class="hint">Nyiss meg egy SCN vagy SKP fájlt.</p></div>
    <div class="tree-notice">A fa az SCN-ből felismerhető objektumokat mutatja. A térbeli csoportok becslések, nem igazolt bútoregységek.</div>
   </aside>
   <main class="viewport-wrapper">
    <div id="viewport" aria-label="Forgatható 3D nézet">
     <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
-    <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide a 3D-modellt, vagy használd a Megnyitás gombot.</p><p class="secondary">A katalógusmodellek részletes geometriája nem minden SCN-fájlban érhető el.</p></div>
+    <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide az SCN, SKP vagy más 3D-modellt, vagy kattints a Megnyitás gombra.</p><p class="secondary">Az SKP saját geometriai és komponensadatait megőrizzük; az SCN továbbra is részben becsült.</p></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <div class="orbit-help">Jobb egér: forgatás · Görgő: nagyítás · Benyomott görgő: mozgatás</div>
     <div class="axis-label">Z ↑ &nbsp; Y ↗ &nbsp; X →</div>
