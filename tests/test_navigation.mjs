@@ -17,6 +17,20 @@ assert(js.includes('else refitCameraToVisibleObjects();'), 'Hidden/restored non-
 assert(js.includes('else {refitCameraToVisibleObjects();renderStructureTree();}'), 'Tree controls must reframe non-SCN components');
 assert(/if\s*\(refit\)\s*fitView\(\);\s*else\s*refitCameraToVisibleObjects\(\);/.test(js), 'SCN visibility changes must reframe without reset to ISO');
 
+// Regression: camera-fit and actual full-screen-only 3D presentation are distinct.
+assert(html.includes('id="resetView"'), 'Keep original full-scene camera fit control');
+assert(html.includes('id="enterModelOnly"'), 'Provide a separate model-only fullscreen control');
+assert(html.includes('id="exitModelOnly"'), 'Provide a fullscreen return button within the viewport');
+assert(js.includes("$('resetView').addEventListener('click', fitView);"), 'Old full-view behavior must stay unchanged');
+assert(js.includes("viewport.requestFullscreen()"), 'Fullscreen must request the real display area');
+assert(js.includes('function enterModelOnlyMode()') && js.includes('function exitModelOnlyMode()'), 'Separate fullscreen entry/exit behaviors required');
+assert(js.includes("event.key === 'Escape' && modelOnlyMode"), 'Escape must exit model-only view');
+assert(js.includes("document.addEventListener('fullscreenchange'"), 'Native Escape/fullscreen exit must restore normal UI');
+assert(js.includes("document.body.classList.add('model-only-mode')"), 'Fullscreen hides application chrome');
+assert(js.includes("document.body.classList.remove('model-only-mode')"), 'Exiting fullscreen restores application chrome');
+assert(js.includes("grid.visible = !modelOnlyMode && $('showGrid').checked;"), 'Hide grid in model-only mode');
+assert(js.includes("axes.visible = !modelOnlyMode && $('showAxes').checked;"), 'Hide XYZ helper in model-only mode');
+
 // 3D picking must locate and highlight the exact corresponding tree entry.
 assert(html.includes('id="showAxes"'), 'XYZ axes must have a user-facing switch');
 assert(js.includes("axes.visible = $('showAxes').checked;"), '3D axes must follow the switch');
