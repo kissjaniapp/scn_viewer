@@ -22,6 +22,7 @@
    <label class="file-button primary" for="fileInput">📂 Megnyitás</label>
    <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.skp" multiple hidden/>
    <button id="resetView">⤢ Teljes nézet</button>
+   <button id="enterModelOnly" title="Csak a modell megjelenítése teljes képernyőn">⛶ Csak modell</button>
    <button id="toggleTree">☷ Szerkezet</button>
    <button id="measureToolbar">📏 Méretezés</button>
    <button id="showAllToolbar">◉ Összes mutatása</button>
@@ -37,6 +38,7 @@
   </aside>
   <main class="viewport-wrapper">
    <div id="viewport" aria-label="Forgatható 3D nézet">
+    <button id="exitModelOnly" class="model-only-exit" hidden title="Vissza a szerkesztő nézethez (Esc)">↩ Vissza <span>Esc</span></button>
     <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
     <div id="emptyState" class="empty-state"><div class="cube-icon">⬡</div><h2>Nyiss meg egy SCN fájlt</h2><p>Húzd ide az SCN, SKP vagy más 3D-modellt, vagy kattints a Megnyitás gombra.</p><p class="secondary">Az SKP saját geometriai és komponensadatait megőrizzük; az SCN továbbra is részben becsült.</p></div>
     <div id="toast" role="status" aria-live="polite"></div>
