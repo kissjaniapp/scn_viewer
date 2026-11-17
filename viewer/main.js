@@ -241,6 +241,8 @@ function prepareModel(group, name) {
  hiddenObjects.clear();
  treeNodeElements = new Map();
  treeExpanded = new WeakMap();
+ // The document root stays open so the top-level, collapsed groups are visible.
+ treeExpanded.set(model,true);
  refreshHiddenObjects();
  scnRecordMeshes = native?.meshes || new Map();
  scnRegionGroups = native?.groups || new Map();
