@@ -669,7 +669,7 @@ function setTreeNodeExpanded(object, expanded) {
 // Select the *actual* clicked mesh in the tree, even in cabinet-measurement
 // mode (which may show its parent group's dimensions in the inspector).
 // Only this ancestor chain is opened; all unrelated groups remain collapsed.
-function syncTreeSelection(target = selectedMesh) {
+function syncTreeSelection(target = selectedMesh, {revealParents = true} = {}) {
  const area=$('structureTree');
  if (!area) return;
  area.querySelectorAll('.tree-active').forEach(row => {
@@ -681,9 +681,11 @@ function syncTreeSelection(target = selectedMesh) {
  while (object && !treeNodeElements.has(object)) object=object.parent;
  if (!object) return;
  const node=treeNodeElements.get(object);
- for(let ancestor=object.parent; ancestor; ancestor=ancestor.parent) {
-  if(treeNodeElements.has(ancestor)) setTreeNodeExpanded(ancestor,true);
-  if(ancestor===model) break;
+ if(revealParents) {
+  for(let ancestor=object.parent; ancestor; ancestor=ancestor.parent) {
+   if(treeNodeElements.has(ancestor)) setTreeNodeExpanded(ancestor,true);
+   if(ancestor===model) break;
+  }
  }
  node.row.classList.add('tree-active');
  node.row.setAttribute('aria-selected','true');
@@ -742,8 +744,10 @@ function renderStructureTree() {
     else {refitCameraToVisibleObjects();renderStructureTree();}
     refreshHiddenObjects();
    }
-   setSelection(mesh);
-   syncTreeSelection(object);
+   // A tree-label click ONLY selects. Expand/collapse stays exclusively
+   // under the user's control via the caret button.
+   setSelection(mesh,{revealInTree:false});
+   syncTreeSelection(object,{revealParents:false});
    focusOnObject(object);
   });
   row.append(toggle,checkbox,labelButton);wrapper.append(row);
@@ -1006,7 +1010,7 @@ function updateSelectionStats() {
   $(id).textContent = details ? `${format(details.size[axis] * mmPerUnit, 1)} mm` : '–';
  }
 }
-function setSelection(mesh) {
+function setSelection(mesh, {revealInTree = true} = {}) {
  clearSelection();
  if (!mesh) return;
  selectedMesh = mesh;
@@ -1018,7 +1022,7 @@ function setSelection(mesh) {
  scene.add(selectionBox);
  updateSelectionStats();
  refreshPositionPanel();
- syncTreeSelection(mesh);
+ syncTreeSelection(mesh,{revealParents:revealInTree});
  invalidate();
 }
 function refreshSelection() {
