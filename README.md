@@ -1,4 +1,13 @@
-# SCN Viewer v2.2.0 – SketchUp (.SKP) közvetlen import
+# SCN Viewer v2.2.1 – 3D kijelölés szinkronban a szerkezeti fával
+
+- Az SKP/SCN nézetben bal gombbal kattintott panel vagy objektum kijelölése megkeresi és kiemeli ugyanazt a 3D objektumot a bal oldali szerkezetben.
+- Kijelöléskor a megfelelő ős-csoportok automatikusan kinyílnak, és a fa odagörget a kijelölt sorhoz. Más csoportokat nem nyit ki.
+- Fájl megnyitásakor a teljes jelenet gyökere nyitva marad, minden alatta lévő csoport becsukva indul.
+- A kijelölt sor mellett lévő pipa elrejti vagy visszakapcsolja az adott objektumot. Az elrejtett elemek csoportjai következetesen rejtve maradnak.
+- Mind kinyitása / Összecsukás gombok továbbra is működnek. Az eredeti fájl nem módosul.
+
+---
+# SCN Viewer v2.2.1 – SketchUp (.SKP) közvetlen import
 
 A Windows 11 SCN Viewer mostantól SKP-fájlt is tud megnyitni SketchUp telepítése nélkül. Az OpenSKP 1.5.0 (MIT licenc) valódi komponensgeometriát, anyagokat és elhelyezéseket olvas ki, amelyeket GLB 3D modellként jelenít meg a Viewer.
 
@@ -10,25 +19,25 @@ A Windows 11 SCN Viewer mostantól SKP-fájlt is tud megnyitni SketchUp telepít
 - A régebbi vagy különleges SKP-verziók közül nem mind garantáltan olvasható; a beolvasó hibaüzenetet ad, ha nem sikerül.
 - A közvetlen SKP-támogatás önmagában nem javítja meg a régi SCN-dekóder hiányzó katalógusgeometriáját. Az eredeti SCN-változatlanul nyitható.
 
-Külső, MIT licencű könyvtár: https://github.com/iamahsanmehmood/openskp . A Windows telepítő a sikeres GitHub Actions-futás Artifacts részében található SCN_Viewer_v2.2.0_Telepito néven.
+Külső, MIT licencű könyvtár: https://github.com/iamahsanmehmood/openskp . A Windows telepítő a sikeres GitHub Actions-futás Artifacts részében található SCN_Viewer_v2.2.1_Telepito néven.
 
 ---
 
-# SCN Viewer v2.2.0 – javított SCN geometria (678A33CD_0368_08.scn minta)
+# SCN Viewer v2.2.1 – javított SCN geometria (678A33CD_0368_08.scn minta)
 
-Az ellenőrzött mintában 915 dekódolható rekord található: 735 dekorlap, 120 CUBE/Sík jellegű téglatest, 42 nulla magasságú SURF2D/CIRC322D síkidom és 18 további katalógus-/szerelvényrekord. A régi beolvasó a 42 síkidomot kihagyta, a CUBE/Sík elemeket részben félrevezető helyettesítő vázlatként kezelte. A v2.2.0 a 2D síkokat és köröket eredeti méretekkel külön síkgeometriaként, a primitív dobozokat tömör objektumként rajzolja, és a rejtett objektumokat nem számítja bele a látható modell méreteibe. Alapnézet: matt fehér, segédrács és élrajz kikapcsolva (mindkettő visszakapcsolható).
+Az ellenőrzött mintában 915 dekódolható rekord található: 735 dekorlap, 120 CUBE/Sík jellegű téglatest, 42 nulla magasságú SURF2D/CIRC322D síkidom és 18 további katalógus-/szerelvényrekord. A régi beolvasó a 42 síkidomot kihagyta, a CUBE/Sík elemeket részben félrevezető helyettesítő vázlatként kezelte. A v2.2.1 a 2D síkokat és köröket eredeti méretekkel külön síkgeometriaként, a primitív dobozokat tömör objektumként rajzolja, és a rejtett objektumokat nem számítja bele a látható modell méreteibe. Alapnézet: matt fehér, segédrács és élrajz kikapcsolva (mindkettő visszakapcsolható).
 
 A teljes SCN-jelenet betöltődik, a szerkezeti fa és a bútor/alkatrész elrejtése megmarad. A tömör primitív itt az SCN-ben megadott méretekből épül, nem a pontos, textúrázott katalóguspoligonokból. Az eredeti látványterven szereplő falak, székek és monitorok tökéletes visszaállítása továbbra sem garantált, mert az SCN nem tartalmaz minden szükséges katalógushálót és textúrát. **A belső szerkezetből becsült elemek nem használhatók szabászatra vagy CNC gyártásra.** A személyes SCN-mintát nem tettük közzé.
 
 ---
 
-# SCN Viewer v2.2.0 – új CAD felület
+# SCN Viewer v2.2.1 – új CAD felület
 
 Háromoszlopos sötét munkafelület: bal oldalt a teljes importált objektumfa láthatósági jelölőnégyzetekkel, középen nagy 3D nézet, jobb oldalt kijelölés, méretek, elrejtés/visszaállítás, nézet gyorsgombok és lenyitható speciális beállítások. Megmarad a korábbi egérvezérlés és a teljes betöltött jelenet. Az SCN-ben ténylegesen nem rendelkezésre álló KitchenDraw katalógusmodelleket ez a változat sem tudja rekonstruálni; az előző látványkép csak felület- és látványterv, nem a bináris SCN-ből visszafejtett hiteles modell. A szerkezeti fa térbeli jelenetrészei becsült csoportok, nem eredeti szekrényazonosítók.
 
 ---
 
-# SCN Viewer v2.2.0 – teljes jelenet és elemenkénti elrejtés
+# SCN Viewer v2.2.1 – teljes jelenet és elemenkénti elrejtés
 
 Az összes sikeresen dekódolt SCN objektum és jelenetrész automatikusan látszik: nincs többé jelenetrész-választó, sem kategóriánkénti elrejtés. Szekrény/alkatrész kijelölés után a **Kijelölt bútor / alkatrész elrejtése** gombbal az adott objektum vagy csoport elrejthető, az **Elrejtett elemek** listából egyenként vagy egyszerre visszakapcsolható. A csoportok térbeli becslések, nem garantált KitchenDraw szekrényhierarchia. Az eredeti SCN fájl nem módosul. A katalógusgeometriák továbbra is egyszerűsített vázlatok.
 
