@@ -85,6 +85,9 @@ let scnFileHash = null;
 let scnCorrections = {};
 let positionSaveFailed = false;
 const hiddenObjects = new Set();
+// Identity-based references remain stable when the scene tree is redrawn.
+let treeNodeElements = new Map();
+let treeExpanded = new WeakMap();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tempVec = new THREE.Vector3();
@@ -236,10 +239,12 @@ function prepareModel(group, name) {
  const native = model.userData.scnState;
  scnLayout = native ? {data:native.data,layout:native.layout} : null;
  hiddenObjects.clear();
+ treeNodeElements = new Map();
+ treeExpanded = new WeakMap();
  refreshHiddenObjects();
  scnRecordMeshes = native?.meshes || new Map();
- renderStructureTree();
  scnRegionGroups = native?.groups || new Map();
+ renderStructureTree();
  scnMaterials = native?.palette || null;
  if(!native) { $('scnExplorer').hidden=true; scnFileHash=null; scnCorrections={}; }
  refreshPositionPanel();
@@ -611,37 +616,101 @@ function applyPositionAdjustment(offset) {
  void saveScnCorrections();
 }
 
+function setTreeNodeExpanded(object, expanded) {
+ const entry = treeNodeElements.get(object);
+ treeExpanded.set(object, expanded);
+ if (!entry || !entry.hasChildren) return;
+ entry.wrapper.classList.toggle('collapsed', !expanded);
+ entry.caret.textContent = expanded ? '▾' : '▸';
+ entry.caret.setAttribute('aria-expanded', String(expanded));
+}
+
+// Select the *actual* clicked mesh in the tree, even in cabinet-measurement
+// mode (which may show its parent group's dimensions in the inspector).
+// Only this ancestor chain is opened; all unrelated groups remain collapsed.
+function syncTreeSelection(target = selectedMesh) {
+ const area=$('structureTree');
+ if (!area) return;
+ area.querySelectorAll('.tree-active').forEach(row => {
+  row.classList.remove('tree-active');
+  row.setAttribute('aria-selected','false');
+ });
+ if (!target) return;
+ let object=target;
+ while (object && !treeNodeElements.has(object)) object=object.parent;
+ if (!object) return;
+ const node=treeNodeElements.get(object);
+ for(let ancestor=object.parent; ancestor; ancestor=ancestor.parent) {
+  if(treeNodeElements.has(ancestor)) setTreeNodeExpanded(ancestor,true);
+  if(ancestor===model) break;
+ }
+ node.row.classList.add('tree-active');
+ node.row.setAttribute('aria-selected','true');
+ // A user click in the 3D view should also locate the matching entry.
+ node.row.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});
+}
+
 function renderStructureTree() {
  const area=$('structureTree');
  if(!area)return;
  area.replaceChildren();
+ treeNodeElements = new Map();
  if(!model){$('treeCount').textContent='';area.textContent='Nyiss meg egy 3D fájlt.';return;}
  let count=0;model.traverse(o=>{if(o.isMesh)count++;});
  $('treeCount').textContent='('+ (model.userData.nativeScn?scnRecordMeshes.size:count)+' elem)';
  function node(object,label,children=[]) {
-  const wrapper=document.createElement('div');wrapper.className='tree-node'+(children.length?'':' leaf');
-  const row=document.createElement('div');row.className='tree-row';
-  const toggle=document.createElement('button');toggle.className='tree-caret';toggle.textContent=children.length?'▾':'·';
-  toggle.addEventListener('click',()=>{wrapper.classList.toggle('collapsed');toggle.textContent=wrapper.classList.contains('collapsed')?'▸':'▾';});
+  const wrapper=document.createElement('div');
+  const hasChildren=children.length>0;
+  const expanded=treeExpanded.get(object)===true;
+  wrapper.className='tree-node'+(hasChildren?' collapsed':' leaf');
+  if(hasChildren && expanded) wrapper.classList.remove('collapsed');
+  const row=document.createElement('div');
+  row.className='tree-row';
+  row.setAttribute('role','treeitem');
+  row.setAttribute('aria-selected','false');
+  const toggle=document.createElement('button');
+  toggle.className='tree-caret';
+  toggle.textContent=hasChildren?(expanded?'▾':'▸'):'·';
+  toggle.title='Csoport kinyitása / becsukása';
+  toggle.setAttribute('aria-expanded',String(expanded));
+  toggle.addEventListener('click',()=>{
+   if(hasChildren) setTreeNodeExpanded(object,treeExpanded.get(object)!==true);
+  });
   const checkbox=document.createElement('input');checkbox.type='checkbox';
-  checkbox.checked=object.visible&&!hiddenObjects.has(object);
+  checkbox.checked=isVisibleInHierarchy(object);
   checkbox.setAttribute('aria-label',label+' láthatóság');
   checkbox.addEventListener('change',()=>{
-   if(checkbox.checked){hiddenObjects.delete(object);object.visible=true;}else{hiddenObjects.add(object);object.visible=false;}
-   if(model.userData.nativeScn)setScnVisible({refit:false});
-   else {modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();}
+   if(checkbox.checked){hiddenObjects.delete(object);object.visible=true;}
+   else {hiddenObjects.add(object);object.visible=false;}
+   if(model.userData.nativeScn) setScnVisible({refit:false});
+   else {
+    if(selectedMesh && !isVisibleInHierarchy(selectedMesh)) clearSelection();
+    modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();
+   }
    refreshHiddenObjects();
   });
-  const labelButton=document.createElement('button');labelButton.className='tree-name';labelButton.textContent=label;labelButton.title=label;
+  const labelButton=document.createElement('button');
+  labelButton.className='tree-name';labelButton.textContent=label;labelButton.title=label;
   labelButton.addEventListener('click',()=>{
    let mesh=object.isMesh?object:null;
    if(!mesh)object.traverse(o=>{if(!mesh&&o.isMesh)mesh=o;});
    if(!mesh)return;
-   if(hiddenObjects.has(object)||!object.visible){hiddenObjects.delete(object);object.visible=true;if(model.userData.nativeScn)setScnVisible({refit:false});refreshHiddenObjects();}
-   setSelection(mesh);focusOnObject(object);
+   if(!isVisibleInHierarchy(object)){
+    hiddenObjects.delete(object);object.visible=true;
+    if(model.userData.nativeScn)setScnVisible({refit:false});
+    else renderStructureTree();
+    refreshHiddenObjects();
+   }
+   setSelection(mesh);
+   syncTreeSelection(object);
+   focusOnObject(object);
   });
   row.append(toggle,checkbox,labelButton);wrapper.append(row);
-  if(children.length){const childList=document.createElement('div');childList.className='tree-children';children.forEach(c=>childList.append(c));wrapper.append(childList);}
+  treeNodeElements.set(object,{wrapper,row,caret:toggle,hasChildren});
+  if(hasChildren){
+   const childList=document.createElement('div');childList.className='tree-children';
+   children.forEach(child=>childList.append(child));wrapper.append(childList);
+  }
   return wrapper;
  }
  if(model.userData.nativeScn) {
@@ -661,6 +730,8 @@ function renderStructureTree() {
     object.children.filter(child=>child.isMesh || child.children.length).map(walk));
   area.append(node(model,'Teljes 3D modell',model.children.map(walk)));
  }
+ // Preserve highlight and expansion across visibility updates and redraws.
+ syncTreeSelection();
 }
 function updateScnItemList() {
  const list=$('scnItemList');
@@ -870,6 +941,7 @@ function selectionDetails() {
 }
 function clearSelection() {
  selectedMesh = null;
+ syncTreeSelection(null);
  refreshPositionPanel();
  if (selectionBox) {
   scene.remove(selectionBox);
@@ -905,6 +977,7 @@ function setSelection(mesh) {
  scene.add(selectionBox);
  updateSelectionStats();
  refreshPositionPanel();
+ syncTreeSelection(mesh);
  invalidate();
 }
 function refreshSelection() {
@@ -1033,8 +1106,8 @@ renderer.domElement.addEventListener('pointerup', event => {
 $('selectionType').addEventListener('change', () => { refreshSelection(); toggleMeasure(false); });
 $('clearSelection').addEventListener('click', clearSelection);
 $('toggleTree').addEventListener('click', ()=>$('structureSidebar').classList.toggle('mobile-hidden'));
-$('expandTree').addEventListener('click', ()=>document.querySelectorAll('.structure-tree .tree-node').forEach(n=>n.classList.remove('collapsed')));
-$('collapseTree').addEventListener('click', ()=>document.querySelectorAll('.structure-tree .tree-node').forEach(n=>n.classList.add('collapsed')));
+$('expandTree').addEventListener('click', ()=>{for(const [object] of treeNodeElements) setTreeNodeExpanded(object,true);});
+$('collapseTree').addEventListener('click', ()=>{for(const [object] of treeNodeElements) setTreeNodeExpanded(object,false);});
 $('measureToolbar').addEventListener('click', ()=>toggleMeasure());
 $('toggleSettings').addEventListener('click', ()=>{$('advancedSettings').open=!$('advancedSettings').open;});
 $('showAllToolbar').addEventListener('click', ()=>{$('showAllObjects').click();});
