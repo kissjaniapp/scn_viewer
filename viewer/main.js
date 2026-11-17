@@ -162,6 +162,8 @@ function updateGrid() {
  else grid.position.y = modelBox ? modelBox.min.y - s * 0.02 : 0;
  axes.position.copy(center);
  grid.visible = $('showGrid').checked;
+ axes.visible = $('showAxes').checked;
+ document.querySelector('.axis-label').hidden = !$('showAxes').checked;
  invalidate();
 }
 // Recompute the orbit pivot and zoom limits from ONLY the currently visible
@@ -1179,6 +1181,7 @@ $('mmPerUnit').addEventListener('input', e => {
 });
 $('upAxis').addEventListener('change', e => { setAxis(e.target.value); updateGrid(); updateSelectionStats(); });
 $('showGrid').addEventListener('change', updateGrid);
+$('showAxes').addEventListener('change', updateGrid);
 $('showEdges').addEventListener('change', e => toggleEdges(e.target.checked));
 $('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
