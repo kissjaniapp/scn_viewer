@@ -1223,6 +1223,9 @@ document.addEventListener('keydown', event => {
 });
 document.addEventListener('fullscreenchange', () => {
  if (modelOnlyMode && document.fullscreenElement !== viewport) exitModelOnlyMode();
+ else if (modelOnlyMode && document.fullscreenElement === viewport) {
+  requestAnimationFrame(() => { resize(); refitCameraToVisibleObjects(); });
+ }
 });
 $('resetView').addEventListener('click', fitView);
 $('clearMeasure').addEventListener('click', clearMeasure);
