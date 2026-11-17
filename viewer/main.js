@@ -14,6 +14,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
+let modelOnlyMode = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1e8);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -161,9 +162,9 @@ function updateGrid() {
  if (upAxis === 'Z') grid.position.z = modelBox ? modelBox.min.z - s * 0.02 : 0;
  else grid.position.y = modelBox ? modelBox.min.y - s * 0.02 : 0;
  axes.position.copy(center);
- grid.visible = $('showGrid').checked;
- axes.visible = $('showAxes').checked;
- document.querySelector('.axis-label').hidden = !$('showAxes').checked;
+ grid.visible = !modelOnlyMode && $('showGrid').checked;
+ axes.visible = !modelOnlyMode && $('showAxes').checked;
+ document.querySelector('.axis-label').hidden = modelOnlyMode || !$('showAxes').checked;
  invalidate();
 }
 // Recompute the orbit pivot and zoom limits from ONLY the currently visible
@@ -1172,6 +1173,57 @@ $('applyPosition').addEventListener('click', () => applyPositionAdjustment(
 $('resetPosition').addEventListener('click', () => applyPositionAdjustment([0,0,0]));
 $('fileInput').addEventListener('change', e => { openFiles(e.target.files); e.target.value = ''; });
 $('measureToggle').addEventListener('click', () => toggleMeasure());
+// Two distinct operations:
+//  - "Teljes nézet" (resetView) fits the model in the regular three-column UI.
+//  - "Csak modell" uses the whole screen and hides UI/overlays until Back/Escape.
+// Keep the existing OrbitControls instance so the pointer gestures never reset.
+function refreshModelOnlyRendering() {
+ updateGrid();
+ if (selectionBox) selectionBox.visible = !modelOnlyMode;
+ if (line) line.visible = !modelOnlyMode;
+ for (const marker of markers) marker.visible = !modelOnlyMode;
+ invalidate();
+}
+function exitModelOnlyMode() {
+ if (!modelOnlyMode) return;
+ modelOnlyMode = false;
+ document.body.classList.remove('model-only-mode');
+ $('exitModelOnly').hidden = true;
+ if (document.fullscreenElement === viewport && document.exitFullscreen) {
+  void document.exitFullscreen().catch(() => {});
+ }
+ requestAnimationFrame(() => {
+  resize();
+  if (model) refitCameraToVisibleObjects();
+  refreshModelOnlyRendering();
+ });
+}
+function enterModelOnlyMode() {
+ if (modelOnlyMode) return;
+ if (!model) return notify('Nyiss meg egy modellt a teljes képernyős nézethez!');
+ modelOnlyMode = true;
+ document.body.classList.add('model-only-mode');
+ $('exitModelOnly').hidden = false;
+ requestAnimationFrame(() => {
+  resize();
+  refitCameraToVisibleObjects();
+  refreshModelOnlyRendering();
+ });
+ // Native fullscreen also hides the Windows window decorations where supported.
+ // Fixed-position CSS provides a usable in-app fullscreen fallback.
+ if (viewport.requestFullscreen) void viewport.requestFullscreen().catch(() => {});
+}
+$('enterModelOnly').addEventListener('click', enterModelOnlyMode);
+$('exitModelOnly').addEventListener('click', exitModelOnlyMode);
+document.addEventListener('keydown', event => {
+ if (event.key === 'Escape' && modelOnlyMode) {
+  event.preventDefault();
+  exitModelOnlyMode();
+ }
+});
+document.addEventListener('fullscreenchange', () => {
+ if (modelOnlyMode && document.fullscreenElement !== viewport) exitModelOnlyMode();
+});
 $('resetView').addEventListener('click', fitView);
 $('clearMeasure').addEventListener('click', clearMeasure);
 $('undoPoint').addEventListener('click', () => { snapPoints.pop(); renderMeasure(); });
@@ -1206,6 +1258,9 @@ function invalidate() {
  requestAnimationFrame(() => {
   renderRequested = false;
   controls.update();
+  if (selectionBox) selectionBox.visible = !modelOnlyMode;
+  if (line) line.visible = !modelOnlyMode;
+  for (const marker of markers) marker.visible = !modelOnlyMode;
   renderer.render(scene, camera);
  });
 }
