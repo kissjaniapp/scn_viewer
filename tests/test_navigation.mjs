@@ -22,6 +22,12 @@ assert(js.includes('function syncTreeSelection('), '3D selection/tree synchroniz
 assert(js.includes('syncTreeSelection(mesh);'), '3D selection must update highlighted tree item');
 assert(js.includes('node.row.scrollIntoView('), 'Selected part must scroll into view');
 assert(js.includes('setTreeNodeExpanded(ancestor,true)'), 'Open only selected part ancestor chain');
+assert(js.includes('function syncTreeSelection(target = selectedMesh, {revealParents = true} = {})'), 'Tree sync must permit no-expansion selection');
+assert(js.includes('if(revealParents) {'), 'Expanding parents must be conditional');
+assert(js.includes('setSelection(mesh,{revealInTree:false});'), 'Clicking sidebar label must not expand its parent');
+assert(js.includes('syncTreeSelection(object,{revealParents:false});'), 'Sidebar click selects the exact row without unfolding it');
+assert(js.includes('function setSelection(mesh, {revealInTree = true} = {})'), '3D click retains auto-reveal by default');
+
 assert(js.includes("treeExpanded.get(object)===true"), 'Groups must default to collapsed');
 assert(js.includes('treeExpanded.set(model,true)'), 'Scene root must remain open');
 assert(js.includes('checkbox.checked=isVisibleInHierarchy(object)'), 'Visibility checkboxes must reflect ancestor visibility');
