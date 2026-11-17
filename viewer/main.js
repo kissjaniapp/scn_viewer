@@ -164,6 +164,45 @@ function updateGrid() {
  grid.visible = $('showGrid').checked;
  invalidate();
 }
+// Recompute the orbit pivot and zoom limits from ONLY the currently visible
+// meshes. Keep the user's viewing angle; never orbit around a hidden cabinet.
+function refitCameraToVisibleObjects() {
+ if (!model) return;
+ modelBox = getModelBounds();
+ if (!modelBox) {
+  // All objects are hidden: do not jump to a phantom origin.
+  updateGrid();
+  updateStats();
+  invalidate();
+  return;
+ }
+ const center = modelBox.getCenter(new THREE.Vector3());
+ const diagonal = modelBox.getSize(new THREE.Vector3()).length();
+ const radius = Math.max(diagonal * .5, .00001);
+ const direction = camera.position.clone().sub(controls.target);
+ if (direction.lengthSq() < 1e-16) {
+  direction.set(upAxis === 'Z' ? 1 : 1, upAxis === 'Z' ? -1 : 1, upAxis === 'Z' ? .95 : 1);
+ }
+ direction.normalize();
+ // SKP coordinates are metres, SCN coordinates are mm: no fixed 10-unit
+ // zoom floor, which would make small SketchUp components disappear.
+ const fov = THREE.MathUtils.degToRad(camera.fov);
+ const halfVertical = Math.max(fov / 2, .001);
+ const halfHorizontal = Math.atan(Math.tan(halfVertical) * Math.max(camera.aspect, .01));
+ const limitingHalfAngle = Math.min(halfVertical, halfHorizontal);
+ const distance = Math.max(radius * 1.2 / Math.sin(limitingHalfAngle), .0001);
+ controls.target.copy(center);
+ camera.position.copy(center).addScaledVector(direction, distance);
+ camera.near = Math.max(radius / 2000, .0000001);
+ camera.far = Math.max(radius * 2000, distance * 5, 10);
+ camera.updateProjectionMatrix();
+ controls.minDistance = Math.max(radius * .002, .00000001);
+ controls.maxDistance = Math.max(radius * 150, distance * 4);
+ controls.update();
+ updateGrid();
+ updateStats();
+ invalidate();
+}
 function fitView() {
  modelBox = getModelBounds();
  if (!modelBox) return;
@@ -475,7 +514,7 @@ function setScnVisible({refit = true} = {}) {
  boundsCache=new WeakMap();
  partSizeCache=new WeakMap();
  if(refit) fitView();
- else {modelBox=getModelBounds(); updateGrid(); updateStats();}
+ else refitCameraToVisibleObjects();
  updateScnItemList();
  renderStructureTree();
  invalidate();
@@ -497,7 +536,7 @@ function refreshHiddenObjects() {
   button.addEventListener('click',()=>{
    hiddenObjects.delete(object); object.visible=true;
    if(model?.userData.nativeScn) setScnVisible({refit:false});
-   else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+   else refitCameraToVisibleObjects();
    refreshHiddenObjects();
   });
   list.append(button);
@@ -511,7 +550,7 @@ function hideSelectedObject() {
  hiddenObjects.add(object); object.visible=false;
  clearSelection();
  if(model.userData.nativeScn) setScnVisible({refit:false});
- else {modelBox=getModelBounds();updateGrid();updateStats();invalidate();}
+ else refitCameraToVisibleObjects();
  refreshHiddenObjects();
  renderStructureTree();
  notify('Elrejtve: '+(object.userData?.cabinetName||object.userData?.partName||object.name));
@@ -687,7 +726,7 @@ function renderStructureTree() {
    if(model.userData.nativeScn) setScnVisible({refit:false});
    else {
     if(selectedMesh && !isVisibleInHierarchy(selectedMesh)) clearSelection();
-    modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();
+    refitCameraToVisibleObjects();renderStructureTree();
    }
    refreshHiddenObjects();
   });
@@ -700,7 +739,7 @@ function renderStructureTree() {
    if(!isVisibleInHierarchy(object)){
     hiddenObjects.delete(object);object.visible=true;
     if(model.userData.nativeScn)setScnVisible({refit:false});
-    else renderStructureTree();
+    else {refitCameraToVisibleObjects();renderStructureTree();}
     refreshHiddenObjects();
    }
    setSelection(mesh);
@@ -1118,7 +1157,7 @@ $('showAllObjects').addEventListener('click', () => {
  for(const object of hiddenObjects) object.visible=true;
  hiddenObjects.clear();
  if(model?.userData.nativeScn) setScnVisible({refit:false});
- else {modelBox=getModelBounds();updateGrid();updateStats();renderStructureTree();invalidate();}
+ else {refitCameraToVisibleObjects();renderStructureTree();}
  refreshHiddenObjects();
 });
 $('applyPosition').addEventListener('click', () => applyPositionAdjustment(
