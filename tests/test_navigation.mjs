@@ -15,7 +15,7 @@ assert(js.includes('camera.position.copy(center).addScaledVector(direction, dist
 assert(js.includes('controls.minDistance = Math.max(radius * .002'), 'Zoom limits must adapt to visible geometry');
 assert(js.includes('else refitCameraToVisibleObjects();'), 'Hidden/restored non-SCN parts must reframe');
 assert(js.includes('else {refitCameraToVisibleObjects();renderStructureTree();}'), 'Tree controls must reframe non-SCN components');
-assert(js.includes('if(refit) fitView();\n else refitCameraToVisibleObjects();'), 'SCN visibility changes must reframe without reset to ISO');
+assert(/if\s*\(refit\)\s*fitView\(\);\s*else\s*refitCameraToVisibleObjects\(\);/.test(js), 'SCN visibility changes must reframe without reset to ISO');
 
 // 3D picking must locate and highlight the exact corresponding tree entry.
 assert(html.includes('id="showAxes"'), 'XYZ axes must have a user-facing switch');
