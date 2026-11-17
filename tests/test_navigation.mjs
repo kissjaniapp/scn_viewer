@@ -23,7 +23,7 @@ assert(js.includes("axes.visible = $('showAxes').checked;"), '3D axes must follo
 assert(js.includes("document.querySelector('.axis-label').hidden = !$('showAxes').checked;"), 'XYZ overlay must follow the switch');
 assert(js.includes("$('showAxes').addEventListener('change', updateGrid);"), 'XYZ switch must refresh render');
 assert(js.includes('function syncTreeSelection('), '3D selection/tree synchronization required');
-assert(js.includes('syncTreeSelection(mesh);'), '3D selection must update highlighted tree item');
+assert(js.includes('syncTreeSelection(mesh,{revealParents:revealInTree});'), '3D selection must update highlighted tree item');
 assert(js.includes('node.row.scrollIntoView('), 'Selected part must scroll into view');
 assert(js.includes('setTreeNodeExpanded(ancestor,true)'), 'Open only selected part ancestor chain');
 assert(js.includes('function syncTreeSelection(target = selectedMesh, {revealParents = true} = {})'), 'Tree sync must permit no-expansion selection');
