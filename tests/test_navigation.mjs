@@ -8,6 +8,15 @@ assert(js.includes('function rebuildControls()') && js.includes('controls.dispos
 for(const value of ['controls.rotateSpeed = .65','MIDDLE: THREE.MOUSE.PAN','RIGHT: THREE.MOUSE.ROTATE','LEFT: null','controls.minPolarAngle','controls.maxPolarAngle']) assert(js.includes(value),value);
 for(const id of ['scnExplorer','finishStyle','scnItemList','hideSelected','hiddenObjectsList','showAllObjects']) assert(html.includes(`id="${id}"`),id);
 assert(js.includes("role==='panel'"), 'Independent panel geometry is required');
+// 3D picking must locate and highlight the exact corresponding tree entry.
+assert(js.includes('function syncTreeSelection('), '3D selection/tree synchronization required');
+assert(js.includes('syncTreeSelection(mesh);'), '3D selection must update highlighted tree item');
+assert(js.includes('node.row.scrollIntoView('), 'Selected part must scroll into view');
+assert(js.includes('setTreeNodeExpanded(ancestor,true)'), 'Open only selected part ancestor chain');
+assert(js.includes("treeExpanded.get(object)===true"), 'Groups must default to collapsed');
+assert(js.includes('treeExpanded.set(model,true)'), 'Scene root must remain open');
+assert(js.includes('checkbox.checked=isVisibleInHierarchy(object)'), 'Visibility checkboxes must reflect ancestor visibility');
+assert(js.includes("setTreeNodeExpanded(object,false)"), 'Collapse-all button must preserve collapse state');
 console.log('OK: stable CAD orbit, separate panel drawing, full-scene visibility, hide/restore and finishes');
 
 // Regression: source SCN rotation is applied to the original placement pivot
