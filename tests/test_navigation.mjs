@@ -8,6 +8,15 @@ assert(js.includes('function rebuildControls()') && js.includes('controls.dispos
 for(const value of ['controls.rotateSpeed = .65','MIDDLE: THREE.MOUSE.PAN','RIGHT: THREE.MOUSE.ROTATE','LEFT: null','controls.minPolarAngle','controls.maxPolarAngle']) assert(js.includes(value),value);
 for(const id of ['scnExplorer','finishStyle','scnItemList','hideSelected','hiddenObjectsList','showAllObjects']) assert(html.includes(`id="${id}"`),id);
 assert(js.includes("role==='panel'"), 'Independent panel geometry is required');
+assert(js.includes('function refitCameraToVisibleObjects()'), 'Visibility changes must reframe the orbit target');
+assert(js.includes('modelBox = getModelBounds();'), 'Reframing must use visible mesh bounds, not original model bounds');
+assert(js.includes('controls.target.copy(center);'), 'Orbit pivot must use visible geometry center');
+assert(js.includes('camera.position.copy(center).addScaledVector(direction, distance);'), 'Reframing preserves orbit direction and rescales zoom');
+assert(js.includes('controls.minDistance = Math.max(radius * .002'), 'Zoom limits must adapt to visible geometry');
+assert(js.includes('else refitCameraToVisibleObjects();'), 'Hidden/restored non-SCN parts must reframe');
+assert(js.includes('else {refitCameraToVisibleObjects();renderStructureTree();}'), 'Tree controls must reframe non-SCN components');
+assert(js.includes('if(refit) fitView();\n else refitCameraToVisibleObjects();'), 'SCN visibility changes must reframe without reset to ISO');
+
 // 3D picking must locate and highlight the exact corresponding tree entry.
 assert(js.includes('function syncTreeSelection('), '3D selection/tree synchronization required');
 assert(js.includes('syncTreeSelection(mesh);'), '3D selection must update highlighted tree item');
