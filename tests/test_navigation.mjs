@@ -18,6 +18,10 @@ assert(js.includes('else {refitCameraToVisibleObjects();renderStructureTree();}'
 assert(js.includes('if(refit) fitView();\n else refitCameraToVisibleObjects();'), 'SCN visibility changes must reframe without reset to ISO');
 
 // 3D picking must locate and highlight the exact corresponding tree entry.
+assert(html.includes('id="showAxes"'), 'XYZ axes must have a user-facing switch');
+assert(js.includes("axes.visible = $('showAxes').checked;"), '3D axes must follow the switch');
+assert(js.includes("document.querySelector('.axis-label').hidden = !$('showAxes').checked;"), 'XYZ overlay must follow the switch');
+assert(js.includes("$('showAxes').addEventListener('change', updateGrid);"), 'XYZ switch must refresh render');
 assert(js.includes('function syncTreeSelection('), '3D selection/tree synchronization required');
 assert(js.includes('syncTreeSelection(mesh);'), '3D selection must update highlighted tree item');
 assert(js.includes('node.row.scrollIntoView('), 'Selected part must scroll into view');
