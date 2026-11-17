@@ -536,7 +536,7 @@ function refreshHiddenObjects() {
   button.addEventListener('click',()=>{
    hiddenObjects.delete(object); object.visible=true;
    if(model?.userData.nativeScn) setScnVisible({refit:false});
-   else refitCameraToVisibleObjects();
+   else {refitCameraToVisibleObjects();renderStructureTree();}
    refreshHiddenObjects();
   });
   list.append(button);
