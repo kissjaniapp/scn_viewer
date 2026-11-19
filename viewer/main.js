@@ -1070,11 +1070,11 @@ function pickPoint(event) {
   const p = [face.a, face.b, face.c].map(i => tempVec.fromBufferAttribute(position, i).clone().applyMatrix4(hit.object.matrixWorld));
   // First choose a vertex within 13 screen pixels; otherwise an edge within 9px.
   const click = new THREE.Vector2(px, py);
-  let bestVertex = null, bestDist = 13;
+  let bestVertex = null, bestDist = 7;
   for (const v of p) { const d = toCanvasPixels(v).distanceTo(click); if (d < bestDist) { bestVertex = v; bestDist = d; } }
   if (bestVertex) point = bestVertex.clone();
   else {
-   let bestEdge = null, bestEdgeDist = 9;
+   let bestEdge = null, bestEdgeDist = 6;
    for (const [a,b] of [[0,1],[1,2],[2,0]]) {
     const va = toCanvasPixels(p[a]), vb = toCanvasPixels(p[b]);
     const projected = closestPointOnSegment(click, va, vb);
@@ -1091,10 +1091,72 @@ function pickPoint(event) {
  }
  return point;
 }
+// Precise 2D drafting overlay: constant-size endpoint crosses and offset
+// dimension line, independent of model size, camera zoom and scene geometry.
+const dimensionLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+dimensionLayer.setAttribute('aria-label', 'Műszaki méretvonalak');
+dimensionLayer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:3';
+viewport.appendChild(dimensionLayer);
 function clearPointGraphics() {
  if (line) { scene.remove(line); line.geometry.dispose(); line.material.dispose(); line = null; }
  for (const marker of markers) { scene.remove(marker); marker.geometry.dispose(); marker.material.dispose(); }
  markers = [];
+ dimensionLayer.replaceChildren();
+}
+function renderDimensionOverlay() {
+ const rect = renderer.domElement.getBoundingClientRect();
+ const width = rect.width, height = rect.height;
+ dimensionLayer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+ dimensionLayer.replaceChildren();
+ if (modelOnlyMode || !width || !height || !snapPoints.length) return;
+ const ns = 'http://www.w3.org/2000/svg';
+ const add = (tag, attributes, label) => {
+  const element = document.createElementNS(ns, tag);
+  Object.entries(attributes).forEach(([key,value])=>element.setAttribute(key, String(value)));
+  if (label !== undefined) element.textContent = label;
+  dimensionLayer.appendChild(element);
+  return element;
+ };
+ const projected = snapPoints.map(point => {
+  const v = point.clone().project(camera);
+  return {x:(v.x+1)*width/2, y:(1-v.y)*height/2, depth:v.z};
+ });
+ const drawLine = (a,b,color='#ffe18b',strokeWidth=1.2) =>
+  add('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:color,'stroke-width':strokeWidth});
+ for (let i=0;i<projected.length;i++) {
+  const p = projected[i];
+  if (p.depth < -1 || p.depth > 1) continue;
+  const color=i===0?'#66eaff':'#ffcb65';
+  // Crosshair points precisely to the world-space snap position (no ball radius).
+  add('circle',{cx:p.x,cy:p.y,r:2,fill:'#10202b',stroke:color,'stroke-width':1.4});
+  drawLine({x:p.x-7,y:p.y},{x:p.x-3,y:p.y},color,1);
+  drawLine({x:p.x+3,y:p.y},{x:p.x+7,y:p.y},color,1);
+  drawLine({x:p.x,y:p.y-7},{x:p.x,y:p.y-3},color,1);
+  drawLine({x:p.x,y:p.y+3},{x:p.x,y:p.y+7},color,1);
+ }
+ if (projected.length !== 2) return;
+ const [a,b]=projected;
+ if ([a,b].some(p=>p.depth < -1 || p.depth > 1)) return;
+ const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
+ if (length<2) return;
+ const nx=-dy/length,ny=dx/length;
+ const offset=30;
+ const a1={x:a.x+nx*offset,y:a.y+ny*offset};
+ const b1={x:b.x+nx*offset,y:b.y+ny*offset};
+ // Extension lines, a thin dimension line, and architectural diagonal ticks.
+ drawLine({x:a.x+nx*5,y:a.y+ny*5},{x:a1.x+nx*8,y:a1.y+ny*8},'#8fbbc8',.9);
+ drawLine({x:b.x+nx*5,y:b.y+ny*5},{x:b1.x+nx*8,y:b1.y+ny*8},'#8fbbc8',.9);
+ drawLine(a1,b1,'#ffe18b',1.25);
+ const tx=(dx/length+nx)*4,ty=(dy/length+ny)*4;
+ for (const p of [a1,b1]) drawLine({x:p.x-tx,y:p.y-ty},{x:p.x+tx,y:p.y+ty},'#ffe18b',1.6);
+ const value=`${format(snapPoints[0].distanceTo(snapPoints[1])*mmPerUnit)} mm`;
+ const mid={x:(a1.x+b1.x)/2,y:(a1.y+b1.y)/2};
+ const fontSize=13;
+ // Keep text horizontal and legible regardless of the 3D viewing angle.
+ const labelWidth=Math.max(55,value.length*7.3+12);
+ add('rect',{x:mid.x-labelWidth/2,y:mid.y-23,width:labelWidth,height:19,rx:3,fill:'#11232f','fill-opacity':'.92'});
+ add('text',{x:mid.x,y:mid.y-9,'text-anchor':'middle','font-family':'Segoe UI, Arial, sans-serif',
+  'font-size':fontSize,'font-weight':600,fill:'#fff3bd'},value);
 }
 function renderMeasure() {
  clearPointGraphics();
@@ -1103,21 +1165,6 @@ function renderMeasure() {
  $('pointB').textContent = formatPoint(b);
  $('distance').textContent = (a && b) ? `${format(a.distanceTo(b) * mmPerUnit)} mm` : '– mm';
  for (const [id, component] of [['dx','x'], ['dy','y'], ['dz','z']]) $(''+id).textContent = a && b ? `${format(Math.abs(b[component]-a[component])*mmPerUnit)} mm` : '–';
- if (!a) return;
- const size = modelBox ? modelBox.getSize(new THREE.Vector3()).length() : 1000;
- const r = Math.max(size * .005, .001);
- snapPoints.forEach((point, index) => {
-  const sphere = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), new THREE.MeshBasicMaterial({color:index === 0 ? 0x00d8ff : 0xffcb5f, depthTest:false}));
-  sphere.position.copy(point);
-  sphere.renderOrder = 10;
-  scene.add(sphere);
-  markers.push(sphere);
- });
- if (b) {
-  line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]), new THREE.LineBasicMaterial({color:0xffec79,depthTest:false}));
-  line.renderOrder = 9;
-  scene.add(line);
- }
  invalidate();
 }
 function clearMeasure() { snapPoints = []; clearPointGraphics(); renderMeasure(); }
@@ -1242,7 +1289,7 @@ $('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
  if (snapPoints.length !== 2) return notify('Előbb jelölj ki két pontot!');
  const [a,b] = snapPoints;
- const content = `SCN Viewer mérés\nA: ${formatPoint(a)}\nB: ${formatPoint(b)}\nTávolság: ${format(a.distanceTo(b)*mmPerUnit)} mm\nΔX: ${format(Math.abs(a.x-b.x)*mmPerUnit)} mm\nΔY: ${format(Math.abs(a.y-b.y)*mmPerUnit)} mm\nΔZ: ${format(Math.abs(a.z-b.z)*mmPerUnit)} mm`;
+ const content = `JOB Viewer mérés\nA: ${formatPoint(a)}\nB: ${formatPoint(b)}\nTávolság: ${format(a.distanceTo(b)*mmPerUnit)} mm\nΔX: ${format(Math.abs(a.x-b.x)*mmPerUnit)} mm\nΔY: ${format(Math.abs(a.y-b.y)*mmPerUnit)} mm\nΔZ: ${format(Math.abs(a.z-b.z)*mmPerUnit)} mm`;
  try { await navigator.clipboard.writeText(content); notify('Mérési adatok másolva.'); }
  catch { notify('Másolás nem támogatott ezen a címen (használj localhost-ot vagy HTTPS-t).'); }
 });
@@ -1265,6 +1312,7 @@ function invalidate() {
   if (line) line.visible = !modelOnlyMode;
   for (const marker of markers) marker.visible = !modelOnlyMode;
   renderer.render(scene, camera);
+   renderDimensionOverlay();
  });
 }
 new ResizeObserver(() => { resize(); invalidate(); }).observe(viewport);
