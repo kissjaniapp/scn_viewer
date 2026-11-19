@@ -42,7 +42,7 @@ assert "function renderDimensionOverlay()" in js
 assert "document.createElementNS('http://www.w3.org/2000/svg', 'svg')" in js
 assert "renderDimensionOverlay();" in js
 assert "new THREE.SphereGeometry(r" not in js
-assert "bestDist = 7" in js and "bestEdgeDist = 6" in js
+assert "cornerDist=8,edgeDist=7" in js
 assert "JOB Viewer" in (root / "index.html").read_text(encoding="utf-8")
 
 # CAD-style snap target and measurement mode regressions.
