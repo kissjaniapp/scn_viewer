@@ -1219,12 +1219,16 @@ function refreshSavedMeasureList() {
   label.textContent=`${index+1}. ${format(distanceFor(item.points,item.mode)*mmPerUnit)} mm – ${modeLabel}`;
   const remove=document.createElement('button');
   remove.type='button';
-  remove.textContent='Törlés';
-  remove.setAttribute('aria-label',`${index+1}. méret törlése`);
+  remove.className='saved-measure-delete';
+  remove.textContent='✕ Törlés';
+  remove.title=`${index+1}. rögzített méret eltávolítása a rajzról`;
+  remove.setAttribute('aria-label',`${index+1}. rögzített méret törlése a rajzról`);
   remove.addEventListener('click',()=>{
+   // Only the chosen entry is deleted; keep all other dimensions and the active measurement.
    savedMeasures.splice(index,1);
    refreshSavedMeasureList();
    invalidate();
+   notify('A kiválasztott méret törölve a rajzról.');
   });
   row.append(label,remove);
   list.appendChild(row);
