@@ -72,3 +72,11 @@ assert "drawDimension(add, width, height, item.points, item.mode, true)" in js
 assert "function exportPngWithOverlay()" in js
 assert "ctx.drawImage(source,0,0)" in js and "ctx.drawImage(overlay,0,0,output.width,output.height)" in js
 assert "'image/png'" in js and "new XMLSerializer().serializeToString(clone)" in js
+
+# Every saved dimension has its own visible delete button, and deletion
+# affects only the indexed pinned measurement.
+assert "remove.className='saved-measure-delete'" in js
+assert "remove.textContent='✕ Törlés'" in js
+assert "savedMeasures.splice(index,1)" in js
+assert "refreshSavedMeasureList();" in js
+assert "notify('A kiválasztott méret törölve a rajzról.')" in js
