@@ -12,7 +12,7 @@ package = json.loads((root / 'package.json').read_text(encoding='utf-8'))
 
 assert 'PrivilegesRequired=lowest' in iss
 assert '[Icons]' in iss and 'desktopicon' in iss
-assert 'SCN Viewer.exe' in iss
+assert 'JOB Viewer.exe' in iss
 assert 'wscript.exe' not in iss
 assert '[UninstallRun]' not in iss
 assert 'SCN_Viewer_Inditas.vbs' in iss  # cleanup only
@@ -26,7 +26,7 @@ assert 'nodeIntegration: false' in desktop and 'contextIsolation: true' in deskt
 assert 'server.listen(0' in server  # no fixed port conflicts
 assert '127.0.0.1' in server
 assert 'upload-artifact@v4' in workflow
-assert 'SCN_Viewer_v2.3.0_Telepito' in workflow
+assert 'JOB_Viewer_v2.4.0_Telepito' in workflow
 assert 'bundle: true' in jsbuild
 assert (root / 'tools/make_icon.py').is_file()
 print('Desktop installer sources validated.')
