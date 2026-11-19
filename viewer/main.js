@@ -71,6 +71,7 @@ let boundsCache = new WeakMap();
 let partSizeCache = new WeakMap();
 let meshCountCache = new WeakMap();
 let snapPoints = [];
+let savedMeasures = [];
 let line = null;
 let markers = [];
 let modelEdges = [];
@@ -258,6 +259,8 @@ function toggleEdges(enabled) {
 }
 function disposeModel() {
  clearSelection();
+ savedMeasures = [];
+ refreshSavedMeasureList();
  clearMeasure();
  clearEdges();
  if (model) {
@@ -1130,71 +1133,174 @@ function renderDimensionOverlay() {
    }
   }
  }
- const projected = snapPoints.map(point => {
-  const v = point.clone().project(camera);
-  return {x:(v.x+1)*width/2, y:(1-v.y)*height/2, depth:v.z};
- });
- const drawLine = (a,b,color='#ffe18b',strokeWidth=1.2) =>
-  add('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:color,'stroke-width':strokeWidth});
- for (let i=0;i<projected.length;i++) {
-  const p = projected[i];
-  if (p.depth < -1 || p.depth > 1) continue;
-  const color=i===0?'#66eaff':'#ffcb65';
-  // Crosshair points precisely to the world-space snap position (no ball radius).
-  add('circle',{cx:p.x,cy:p.y,r:2,fill:'#10202b',stroke:color,'stroke-width':1.4});
-  drawLine({x:p.x-7,y:p.y},{x:p.x-3,y:p.y},color,1);
-  drawLine({x:p.x+3,y:p.y},{x:p.x+7,y:p.y},color,1);
-  drawLine({x:p.x,y:p.y-7},{x:p.x,y:p.y-3},color,1);
-  drawLine({x:p.x,y:p.y+3},{x:p.x,y:p.y+7},color,1);
+ // Persisted measurements are drawn behind the currently edited dimension.
+ for (const item of savedMeasures) {
+  drawDimension(add, width, height, item.points, item.mode, true);
  }
- if (projected.length !== 2) return;
- let [a,b]=projected;
- const axis=measurementAxis();
- if (axis) {
-  const aligned=snapPoints[0].clone();
-  aligned[axis]=snapPoints[1][axis];
-  const v=aligned.project(camera);
-  const projectedAxis={x:(v.x+1)*width/2,y:(1-v.y)*height/2,depth:v.z};
-  if (projectedAxis.depth>=-1 && projectedAxis.depth<=1) {
-   add('line',{x1:b.x,y1:b.y,x2:projectedAxis.x,y2:projectedAxis.y,stroke:'#8fbbc8','stroke-width':.9,'stroke-dasharray':'4 3'});
-   b=projectedAxis;
-  }
- }
- if ([a,b].some(p=>p.depth < -1 || p.depth > 1)) return;
- const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
- if (length<2) return;
- const nx=-dy/length,ny=dx/length;
- const offset=30;
- const a1={x:a.x+nx*offset,y:a.y+ny*offset};
- const b1={x:b.x+nx*offset,y:b.y+ny*offset};
- // Extension lines, a thin dimension line, and architectural diagonal ticks.
- drawLine({x:a.x+nx*5,y:a.y+ny*5},{x:a1.x+nx*8,y:a1.y+ny*8},'#8fbbc8',.9);
- drawLine({x:b.x+nx*5,y:b.y+ny*5},{x:b1.x+nx*8,y:b1.y+ny*8},'#8fbbc8',.9);
- drawLine(a1,b1,'#ffe18b',1.25);
- const tx=(dx/length+nx)*4,ty=(dy/length+ny)*4;
- for (const p of [a1,b1]) drawLine({x:p.x-tx,y:p.y-ty},{x:p.x+tx,y:p.y+ty},'#ffe18b',1.6);
- const value=`${format(measuredDistance()*mmPerUnit)} mm`;
- const mid={x:(a1.x+b1.x)/2,y:(a1.y+b1.y)/2};
- const fontSize=13;
- // Keep text horizontal and legible regardless of the 3D viewing angle.
- const labelWidth=Math.max(55,value.length*7.3+12);
- add('rect',{x:mid.x-labelWidth/2,y:mid.y-23,width:labelWidth,height:19,rx:3,fill:'#11232f','fill-opacity':'.92'});
- add('text',{x:mid.x,y:mid.y-9,'text-anchor':'middle','font-family':'Segoe UI, Arial, sans-serif',
-  'font-size':fontSize,'font-weight':600,fill:'#fff3bd'},value);
+ drawDimension(add, width, height, snapPoints, $('measureMode').value, false);
 }
-function measurementAxis() {
- if (snapPoints.length!==2) return null;
- const mode=$('measureMode').value;
- if (mode==='free') return null;
+// Project stored WORLD coordinates on every render so annotations follow 3D navigation.
+function measureAxisFor(points,mode) {
+ if (points.length!==2 || mode==='free') return null;
  if (mode!=='ortho') return mode;
- const a=snapPoints[0],b=snapPoints[1];
+ const [a,b]=points;
  return ['x','y','z'].sort((x,y)=>Math.abs(b[y]-a[y])-Math.abs(b[x]-a[x]))[0];
 }
-function measuredDistance() {
- if (snapPoints.length!==2) return 0;
- const axis=measurementAxis();
- return axis ? Math.abs(snapPoints[1][axis]-snapPoints[0][axis]) : snapPoints[0].distanceTo(snapPoints[1]);
+function distanceFor(points,mode) {
+ if (points.length!==2) return 0;
+ const axis=measureAxisFor(points,mode);
+ return axis ? Math.abs(points[1][axis]-points[0][axis]) : points[0].distanceTo(points[1]);
 }
+function drawDimension(add,width,height,points,mode,saved) {
+ if (points.length!==2) return;
+ const projected=points.map(p=>{
+  const v=p.clone().project(camera);
+  return {x:(v.x+1)*width/2,y:(1-v.y)*height/2,depth:v.z};
+ });
+ if (projected.some(p=>p.depth < -1 || p.depth > 1)) return;
+ const tone=saved?'#9ddaff':'#ffe18b';
+ const secondary=saved?'#709fbf':'#8fbbc8';
+ const ink=saved?'#f0faff':'#fff3bd';
+ const background=saved?'#173448':'#11232f';
+ const drawLine=(a,b,color=tone,weight=1.2)=>add('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:color,'stroke-width':weight});
+ for (let i=0;i<projected.length;i++) {
+  const p=projected[i],c=saved?'#9ddaff':(i===0?'#66eaff':'#ffcb65');
+  add('circle',{cx:p.x,cy:p.y,r:2,fill:'#10202b',stroke:c,'stroke-width':1.4});
+  drawLine({x:p.x-6,y:p.y},{x:p.x-3,y:p.y},c,1);
+  drawLine({x:p.x+3,y:p.y},{x:p.x+6,y:p.y},c,1);
+  drawLine({x:p.x,y:p.y-6},{x:p.x,y:p.y-3},c,1);
+  drawLine({x:p.x,y:p.y+3},{x:p.x,y:p.y+6},c,1);
+ }
+ let [a,b]=projected;
+ const axis=measureAxisFor(points,mode);
+ if (axis) {
+  const aligned=points[0].clone();
+  aligned[axis]=points[1][axis];
+  const v=aligned.project(camera);
+  const p={x:(v.x+1)*width/2,y:(1-v.y)*height/2,depth:v.z};
+  if (p.depth>=-1 && p.depth<=1) {
+   add('line',{x1:b.x,y1:b.y,x2:p.x,y2:p.y,stroke:secondary,'stroke-width':.9,'stroke-dasharray':'4 3'});
+   b=p;
+  }
+ }
+ const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+ if (len<2) return;
+ const nx=-dy/len,ny=dx/len;
+ const offset=saved?27:30;
+ const a1={x:a.x+nx*offset,y:a.y+ny*offset};
+ const b1={x:b.x+nx*offset,y:b.y+ny*offset};
+ drawLine({x:a.x+nx*5,y:a.y+ny*5},{x:a1.x+nx*8,y:a1.y+ny*8},secondary,.9);
+ drawLine({x:b.x+nx*5,y:b.y+ny*5},{x:b1.x+nx*8,y:b1.y+ny*8},secondary,.9);
+ drawLine(a1,b1,tone,1.25);
+ const tx=(dx/len+nx)*4,ty=(dy/len+ny)*4;
+ for (const p of [a1,b1]) drawLine({x:p.x-tx,y:p.y-ty},{x:p.x+tx,y:p.y+ty},tone,1.6);
+ const value=`${format(distanceFor(points,mode)*mmPerUnit)} mm`;
+ const mid={x:(a1.x+b1.x)/2,y:(a1.y+b1.y)/2};
+ const labelWidth=Math.max(55,value.length*7.3+12);
+ add('rect',{x:mid.x-labelWidth/2,y:mid.y-23,width:labelWidth,height:19,rx:3,fill:background,'fill-opacity':'.92'});
+ add('text',{x:mid.x,y:mid.y-9,'text-anchor':'middle','font-family':'Segoe UI, Arial, sans-serif','font-size':13,'font-weight':600,fill:ink},value);
+}
+function refreshSavedMeasureList() {
+ const list=$('savedMeasureList');
+ list.replaceChildren();
+ $('clearSavedMeasures').disabled=savedMeasures.length===0;
+ if (!savedMeasures.length) {
+  const empty=document.createElement('p');
+  empty.className='hint';
+  empty.textContent='Még nincs rögzített méret.';
+  list.appendChild(empty);
+  return;
+ }
+ savedMeasures.forEach((item,index)=>{
+  const row=document.createElement('div');
+  row.className='saved-measure-item';
+  const label=document.createElement('span');
+  const modeLabel={free:'Szabad',ortho:'Orto (automatikus)',x:'Orto X',y:'Orto Y',z:'Orto Z'}[item.mode]||item.mode;
+  label.textContent=`${index+1}. ${format(distanceFor(item.points,item.mode)*mmPerUnit)} mm – ${modeLabel}`;
+  const remove=document.createElement('button');
+  remove.type='button';
+  remove.textContent='Törlés';
+  remove.setAttribute('aria-label',`${index+1}. méret törlése`);
+  remove.addEventListener('click',()=>{
+   savedMeasures.splice(index,1);
+   refreshSavedMeasureList();
+   invalidate();
+  });
+  row.append(label,remove);
+  list.appendChild(row);
+ });
+}
+function freezeCurrentMeasure() {
+ if (snapPoints.length!==2) return notify('Előbb jelölj ki két pontot vagy egy élt!');
+ savedMeasures.push({
+  points:snapPoints.map(p=>p.clone()),
+  mode:$('measureMode').value
+ });
+ snapPoints=[];
+ hoveredSnap=null;
+ refreshSavedMeasureList();
+ renderMeasure();
+ notify('Méret rögzítve. Folytathatod a méretezést.');
+}
+async function exportPngWithOverlay() {
+ if (!model) return notify('Előbb nyiss meg egy modellt!');
+ const btn=$('exportPng');
+ btn.disabled=true;
+ let svgUrl=null;
+ try {
+  // Render and capture in the same turn (WebGL preserveDrawingBuffer is false).
+  renderer.render(scene,camera);
+  const source=renderer.domElement;
+  const output=document.createElement('canvas');
+  output.width=source.width;
+  output.height=source.height;
+  const ctx=output.getContext('2d');
+  if (!ctx) throw new Error('A PNG rajzvászon nem hozható létre.');
+  ctx.fillStyle='#172435';
+  ctx.fillRect(0,0,output.width,output.height);
+  ctx.drawImage(source,0,0);
+  // Do not export the green mouse-hover preview. Include all locked dimensions.
+  const oldHover=hoveredSnap;
+  hoveredSnap=null;
+  try { renderDimensionOverlay(); }
+  finally { hoveredSnap=oldHover; }
+  const clone=dimensionLayer.cloneNode(true);
+  const rect=source.getBoundingClientRect();
+  clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  clone.setAttribute('width',String(rect.width));
+  clone.setAttribute('height',String(rect.height));
+  const svgText=new XMLSerializer().serializeToString(clone);
+  svgUrl=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml;charset=utf-8'}));
+  const overlay=new Image();
+  await new Promise((resolve,reject)=>{
+   overlay.onload=resolve;
+   overlay.onerror=()=>reject(new Error('A méretek képe nem tölthető be.'));
+   overlay.src=svgUrl;
+  });
+  ctx.drawImage(overlay,0,0,output.width,output.height);
+  const png=await new Promise((resolve,reject)=>output.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG előállítás sikertelen.')),'image/png'));
+  const url=URL.createObjectURL(png);
+  try {
+   const link=document.createElement('a');
+   const name=(originName||'JOB_Viewer').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,65);
+   link.download=`${name}_meretezes.png`;
+   link.href=url;
+   document.body.appendChild(link);
+   link.click();
+   link.remove();
+  } finally { setTimeout(()=>URL.revokeObjectURL(url),30000); }
+  notify('PNG elkészült a rajzzal és a méretekkel.');
+ } catch(error) {
+  console.error('PNG export hiba:',error);
+  notify('PNG mentési hiba: '+error.message);
+ } finally {
+  if (svgUrl) URL.revokeObjectURL(svgUrl);
+  btn.disabled=false;
+  invalidate();
+ }
+}
+function measurementAxis() { return measureAxisFor(snapPoints,$('measureMode').value); }
+function measuredDistance() { return distanceFor(snapPoints,$('measureMode').value); }
 function renderMeasure() {
  clearPointGraphics();
  const [a, b] = snapPoints;
@@ -1326,10 +1432,17 @@ document.addEventListener('fullscreenchange', () => {
 });
 $('resetView').addEventListener('click', fitView);
 $('clearMeasure').addEventListener('click', clearMeasure);
+$('freezeMeasure').addEventListener('click',freezeCurrentMeasure);
+$('clearSavedMeasures').addEventListener('click',()=>{
+ savedMeasures=[];
+ refreshSavedMeasureList();
+ invalidate();
+});
+$('exportPng').addEventListener('click',exportPngWithOverlay);
 $('undoPoint').addEventListener('click', () => { snapPoints.pop(); renderMeasure(); });
 $('mmPerUnit').addEventListener('input', e => {
  const n = Number(e.target.value);
- if (Number.isFinite(n) && n > 0) { mmPerUnit = n; renderMeasure(); updateStats(); }
+ if (Number.isFinite(n) && n > 0) { mmPerUnit = n; renderMeasure(); refreshSavedMeasureList(); updateStats(); }
 });
 $('upAxis').addEventListener('change', e => { setAxis(e.target.value); updateGrid(); updateSelectionStats(); });
 $('showGrid').addEventListener('change', updateGrid);
@@ -1367,5 +1480,6 @@ function invalidate() {
 }
 new ResizeObserver(() => { resize(); invalidate(); }).observe(viewport);
 resize();
+refreshSavedMeasureList();
 invalidate();
 
