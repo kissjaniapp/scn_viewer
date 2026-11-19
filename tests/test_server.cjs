@@ -21,10 +21,11 @@ test('Native SCN Viewer desktop server: static-only and loopback', async t => {
  assert.equal(page.status, 200);
  const policy=page.headers.get('content-security-policy');
  assert.ok(policy, 'Desktop must set a Content-Security-Policy');
- assert.match(policy,/script-src 'self' 'wasm-unsafe-eval'/,
-  'Allow native WASM CAD compilation without permitting arbitrary JS eval');
- assert.doesNotMatch(policy,/script-src[^;]*'unsafe-eval'/,
-  'Do not enable unrestricted JavaScript eval');
+ assert.match(policy,/script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'/,
+  'The local OpenCascade/Emscripten STEP runtime needs JavaScript and WASM evaluation');
+ assert.match(policy,/connect-src 'self'/,'The viewer must not connect to external sites');
+ assert.doesNotMatch(policy,/script-src[^;]*https?:/,'Only bundled local scripts may load');
+ assert.equal(new URL(url).hostname,'127.0.0.1','The desktop renderer must stay loopback-only');
 
  assert.match(await page.text(), /SCN Viewer/);
  assert.equal((await fetch(url+'main.js')).status, 200);
