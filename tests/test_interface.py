@@ -44,3 +44,13 @@ assert "renderDimensionOverlay();" in js
 assert "new THREE.SphereGeometry(r" not in js
 assert "bestDist = 7" in js and "bestEdgeDist = 6" in js
 assert "JOB Viewer" in (root / "index.html").read_text(encoding="utf-8")
+
+# CAD-style snap target and measurement mode regressions.
+html = (root / "index.html").read_text(encoding="utf-8")
+assert 'id="showAxes" checked' not in html
+assert 'id="measureMode"' in html and 'value="ortho"' in html
+assert 'function pickFeature(event)' in js
+assert 'new THREE.EdgesGeometry(geo,1)' in js
+assert 'function measurementAxis()' in js and 'function measuredDistance()' in js
+assert "addEventListener('pointermove'" in js
+assert 'hoveredSnap.type' in js
