@@ -80,3 +80,13 @@ assert "remove.textContent='✕ Törlés'" in js
 assert "savedMeasures.splice(index,1)" in js
 assert "refreshSavedMeasureList();" in js
 assert "notify('A kiválasztott méret törölve a rajzról.')" in js
+
+# CAD format support and file-dialog parity.
+assert 'id="fileInput" type="file"' in html
+for ext in (".3mf", ".step", ".stp", ".f3d"):
+    assert ext in html
+assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
+assert "const step=await readStep(await file.arrayBuffer())" in js
+assert "Az F3D Fusion saját archívuma" in js
+assert "job-viewer-logo.svg" in html
+assert "JOB Viewer v2.5.0" in html
