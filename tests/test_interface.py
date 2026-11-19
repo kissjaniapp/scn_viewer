@@ -89,4 +89,4 @@ assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
 assert "const step=await readStep(await file.arrayBuffer())" in js
 assert "Az F3D Fusion saját archívuma" in js
 assert "job-viewer-logo.svg" in html
-assert "JOB Viewer v2.5.2" in html
+assert "JOB Viewer v2.5.3" in html
