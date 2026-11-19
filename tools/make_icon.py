@@ -28,7 +28,7 @@ def main():
     ico = ROOT / "installer" / "SCNViewer.ico"
     ico.write_bytes(header + bytes(directory) + b"".join(blob for _, blob in files))
     shutil.rmtree(ICON_DIR, ignore_errors=True)
-    print(f"JOB Viewer közös SVG logóból előállított Windows ICO: {ico} ({ico.stat().st_size} bájt)")
+    print(f"JOB Viewer Windows ICO generated from single SVG logo: {ico} ({ico.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":
