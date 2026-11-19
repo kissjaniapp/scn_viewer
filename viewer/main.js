@@ -1,5 +1,6 @@
 import { decodeScn } from './scn-parser.js';
 import { decodeSkpToGlb } from './skp-loader.js';
+import { readStep } from './step-loader.js';
 import { classifyScnRecord } from './scn-layout.js';
 import { discoverScnScenes } from './scn-scenes.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
@@ -11,6 +12,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { TDSLoader } from 'three/addons/loaders/TDSLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
@@ -857,10 +859,16 @@ async function openScn(file) {
 }
 async function openFiles(files) {
  const all = Array.from(files);
- const file = all.find(f => /\.(obj|3ds|stl|glb|gltf|scn|skp)$/i.test(f.name));
- if (!file) return notify('SCN, SKP, OBJ, 3DS, STL, GLB vagy GLTF fájlt válassz.');
+ const file = all.find(f => /\.(obj|3ds|stl|glb|gltf|scn|skp|3mf|step|stp|f3d)$/i.test(f.name));
+ if (!file) return notify('Válassz támogatott 3D fájlt (SCN, SKP, 3MF, STEP, OBJ, STL stb.).');
  const extension = file.name.split('.').pop().toLowerCase();
  if (extension === 'scn') { await openScn(file); return; }
+ if (extension === 'f3d') {
+  const msg='Az F3D Fusion saját archívuma nem olvasható közvetlenül. Fusionban válaszd: Fájl → Exportálás → STEP (.step), majd nyisd meg a JOB Viewerben.';
+  $('fileHint').textContent=msg;
+  notify(msg);
+  return;
+ }
  try {
   let result;
   if (extension === 'skp') {
@@ -885,7 +893,15 @@ async function openFiles(files) {
    $('fileHint').textContent = `SketchUp 3D modell · ${converted.resourceCount} egyedi geometriai erőforrás. A méretek mm-ben; a komponenselhelyezések és anyagok az SKP-ből származnak.`;
    return;
   }
-  if (extension === 'obj') {
+  if (extension === '3mf') {
+   result = new ThreeMFLoader().parse(await file.arrayBuffer());
+   $('fileHint').textContent='3MF modell: alkatrészek, színek és hálógeometria beolvasva.';
+  } else if (extension === 'step' || extension === 'stp') {
+   $('fileHint').textContent='STEP szilárdtest-geometria feldolgozása a helyi OpenCascade CAD motorral…';
+   const step=await readStep(await file.arrayBuffer());
+   result=step.scene;
+   $('fileHint').textContent=`STEP modell · ${step.meshCount} külön geometriai alkatrész. A méretek milliméterben értendők.`;
+  } else if (extension === 'obj') {
    const data = await file.text();
    result = new OBJLoader().parse(data);
   } else if (extension === '3ds') {
@@ -904,6 +920,7 @@ async function openFiles(files) {
   }
   if (!result || new THREE.Box3().setFromObject(result).isEmpty()) throw new Error('Nem található 3D geometria a fájlban.');
   $('upAxis').value = ['glb', 'gltf'].includes(extension) ? 'Y' : 'Z';
+  if (['3mf','step','stp'].includes(extension)) {mmPerUnit=1; $('mmPerUnit').value='1';}
   setAxis($('upAxis').value);
   prepareModel(result, file.name);
   $('manifestSection').hidden=true;
