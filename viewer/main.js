@@ -1057,39 +1057,39 @@ function pickHit(event) {
    (!model.userData.nativeScn || h.object.userData.scnRole !== 'proxy'));
  return valid[0] || null; // nearest visible surface; never pick a panel behind the clicked cabinet
 }
-function pickPoint(event) {
- const hit = pickHit(event);
- if (!hit) return null;
- const rect = renderer.domElement.getBoundingClientRect();
- const px = event.clientX - rect.left, py = event.clientY - rect.top;
- let point = hit.point.clone();
- const geometry = hit.object.geometry;
- const face = hit.face;
- if (geometry && face && geometry.attributes.position) {
-  const position = geometry.attributes.position;
-  const p = [face.a, face.b, face.c].map(i => tempVec.fromBufferAttribute(position, i).clone().applyMatrix4(hit.object.matrixWorld));
-  // First choose a vertex within 13 screen pixels; otherwise an edge within 9px.
-  const click = new THREE.Vector2(px, py);
-  let bestVertex = null, bestDist = 7;
-  for (const v of p) { const d = toCanvasPixels(v).distanceTo(click); if (d < bestDist) { bestVertex = v; bestDist = d; } }
-  if (bestVertex) point = bestVertex.clone();
-  else {
-   let bestEdge = null, bestEdgeDist = 6;
-   for (const [a,b] of [[0,1],[1,2],[2,0]]) {
-    const va = toCanvasPixels(p[a]), vb = toCanvasPixels(p[b]);
-    const projected = closestPointOnSegment(click, va, vb);
-    const dist = projected.distanceTo(click);
-    if (dist < bestEdgeDist) {
-     bestEdgeDist = dist;
-     const len = vb.distanceToSquared(va);
-     const t = len < eps ? 0 : THREE.MathUtils.clamp(projected.clone().sub(va).dot(vb.clone().sub(va)) / len, 0, 1);
-     bestEdge = p[a].clone().lerp(p[b], t);
-    }
-   }
-   if (bestEdge) point = bestEdge;
+const cadEdgeCache = new WeakMap();
+let hoveredSnap = null;
+// Hard feature edges exclude triangulation diagonals.
+function pickFeature(event) {
+ const hit=pickHit(event);
+ if (!hit?.object.geometry?.attributes.position) return null;
+ const geo=hit.object.geometry;
+ let edges=cadEdgeCache.get(geo);
+ if (!edges) { edges=new THREE.EdgesGeometry(geo,1); cadEdgeCache.set(geo,edges); }
+ const data=edges.attributes.position;
+ const rect=renderer.domElement.getBoundingClientRect();
+ const click=new THREE.Vector2(event.clientX-rect.left,event.clientY-rect.top);
+ let corner=null,edge=null,cornerDist=8,edgeDist=7;
+ const av=new THREE.Vector3(),bv=new THREE.Vector3();
+ for (let i=0;i<data.count;i+=2) {
+  av.fromBufferAttribute(data,i).applyMatrix4(hit.object.matrixWorld);
+  bv.fromBufferAttribute(data,i+1).applyMatrix4(hit.object.matrixWorld);
+  const surfaceTolerance=Math.max((geo.boundingSphere?.radius||1)*.03,hit.distance*.004);
+  if (hit.point.distanceTo(closestPointOnSegment(hit.point,av,bv))>surfaceTolerance) continue;
+  const va=av.clone().project(camera),vb=bv.clone().project(camera);
+  if ([va.z,vb.z].some(z=>z < -1 || z > 1)) continue;
+  const ap=new THREE.Vector2((va.x+1)*rect.width/2,(1-va.y)*rect.height/2);
+  const bp=new THREE.Vector2((vb.x+1)*rect.width/2,(1-vb.y)*rect.height/2);
+  for (const [world,screen] of [[av,ap],[bv,bp]]) {
+   const d=screen.distanceTo(click);
+   if (d<cornerDist) {cornerDist=d;corner={type:'corner',point:world.clone()};}
+  }
+  const d=closestPointOnSegment(click,ap,bp).distanceTo(click);
+  if (d<edgeDist && ap.distanceTo(bp)>10) {
+   edgeDist=d;edge={type:'edge',a:av.clone(),b:bv.clone()};
   }
  }
- return point;
+ return corner||edge;
 }
 // Precise 2D drafting overlay: constant-size endpoint crosses and offset
 // dimension line, independent of model size, camera zoom and scene geometry.
@@ -1108,7 +1108,7 @@ function renderDimensionOverlay() {
  const width = rect.width, height = rect.height;
  dimensionLayer.setAttribute('viewBox', `0 0 ${width} ${height}`);
  dimensionLayer.replaceChildren();
- if (modelOnlyMode || !width || !height || !snapPoints.length) return;
+ if (modelOnlyMode || !width || !height) return;
  const ns = 'http://www.w3.org/2000/svg';
  const add = (tag, attributes, label) => {
   const element = document.createElementNS(ns, tag);
@@ -1117,6 +1117,19 @@ function renderDimensionOverlay() {
   dimensionLayer.appendChild(element);
   return element;
  };
+ if (measureEnabled && hoveredSnap) {
+  const proj=p=>{ const v=p.clone().project(camera); return {x:(v.x+1)*width/2,y:(1-v.y)*height/2,z:v.z}; };
+  if (hoveredSnap.type==='corner') {
+   const p=proj(hoveredSnap.point);
+   if (p.z>=-1 && p.z<=1) add('rect',{x:p.x-4,y:p.y-4,width:8,height:8,fill:'#152832',stroke:'#45ffae','stroke-width':1.5});
+  } else {
+   const p=proj(hoveredSnap.a),q=proj(hoveredSnap.b);
+   if ([p.z,q.z].every(z=>z>=-1&&z<=1)) {
+    add('line',{x1:p.x,y1:p.y,x2:q.x,y2:q.y,stroke:'#45ffae','stroke-width':2.5});
+    for (const t of [p,q]) add('rect',{x:t.x-3,y:t.y-3,width:6,height:6,fill:'#152832',stroke:'#45ffae','stroke-width':1});
+   }
+  }
+ }
  const projected = snapPoints.map(point => {
   const v = point.clone().project(camera);
   return {x:(v.x+1)*width/2, y:(1-v.y)*height/2, depth:v.z};
@@ -1135,7 +1148,18 @@ function renderDimensionOverlay() {
   drawLine({x:p.x,y:p.y+3},{x:p.x,y:p.y+7},color,1);
  }
  if (projected.length !== 2) return;
- const [a,b]=projected;
+ let [a,b]=projected;
+ const axis=measurementAxis();
+ if (axis) {
+  const aligned=snapPoints[0].clone();
+  aligned[axis]=snapPoints[1][axis];
+  const v=aligned.project(camera);
+  const projectedAxis={x:(v.x+1)*width/2,y:(1-v.y)*height/2,depth:v.z};
+  if (projectedAxis.depth>=-1 && projectedAxis.depth<=1) {
+   add('line',{x1:b.x,y1:b.y,x2:projectedAxis.x,y2:projectedAxis.y,stroke:'#8fbbc8','stroke-width':.9,'stroke-dasharray':'4 3'});
+   b=projectedAxis;
+  }
+ }
  if ([a,b].some(p=>p.depth < -1 || p.depth > 1)) return;
  const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
  if (length<2) return;
@@ -1149,7 +1173,7 @@ function renderDimensionOverlay() {
  drawLine(a1,b1,'#ffe18b',1.25);
  const tx=(dx/length+nx)*4,ty=(dy/length+ny)*4;
  for (const p of [a1,b1]) drawLine({x:p.x-tx,y:p.y-ty},{x:p.x+tx,y:p.y+ty},'#ffe18b',1.6);
- const value=`${format(snapPoints[0].distanceTo(snapPoints[1])*mmPerUnit)} mm`;
+ const value=`${format(measuredDistance()*mmPerUnit)} mm`;
  const mid={x:(a1.x+b1.x)/2,y:(a1.y+b1.y)/2};
  const fontSize=13;
  // Keep text horizontal and legible regardless of the 3D viewing angle.
@@ -1158,16 +1182,29 @@ function renderDimensionOverlay() {
  add('text',{x:mid.x,y:mid.y-9,'text-anchor':'middle','font-family':'Segoe UI, Arial, sans-serif',
   'font-size':fontSize,'font-weight':600,fill:'#fff3bd'},value);
 }
+function measurementAxis() {
+ if (snapPoints.length!==2) return null;
+ const mode=$('measureMode').value;
+ if (mode==='free') return null;
+ if (mode!=='ortho') return mode;
+ const a=snapPoints[0],b=snapPoints[1];
+ return ['x','y','z'].sort((x,y)=>Math.abs(b[y]-a[y])-Math.abs(b[x]-a[x]))[0];
+}
+function measuredDistance() {
+ if (snapPoints.length!==2) return 0;
+ const axis=measurementAxis();
+ return axis ? Math.abs(snapPoints[1][axis]-snapPoints[0][axis]) : snapPoints[0].distanceTo(snapPoints[1]);
+}
 function renderMeasure() {
  clearPointGraphics();
  const [a, b] = snapPoints;
  $('pointA').textContent = formatPoint(a);
  $('pointB').textContent = formatPoint(b);
- $('distance').textContent = (a && b) ? `${format(a.distanceTo(b) * mmPerUnit)} mm` : '– mm';
+ $('distance').textContent = (a && b) ? `${format(measuredDistance() * mmPerUnit)} mm` : '– mm';
  for (const [id, component] of [['dx','x'], ['dy','y'], ['dz','z']]) $(''+id).textContent = a && b ? `${format(Math.abs(b[component]-a[component])*mmPerUnit)} mm` : '–';
  invalidate();
 }
-function clearMeasure() { snapPoints = []; clearPointGraphics(); renderMeasure(); }
+function clearMeasure() { snapPoints = []; hoveredSnap=null; clearPointGraphics(); renderMeasure(); }
 function toggleMeasure(force) {
  measureEnabled = typeof force === 'boolean' ? force : !measureEnabled;
  $('measureToggle').classList.toggle('active', measureEnabled);
@@ -1175,8 +1212,17 @@ function toggleMeasure(force) {
  $('modeStatus').classList.toggle('active', measureEnabled);
  $('modeStatus').textContent = measureEnabled ? 'Méretezés: 2 pont' : 'Kijelölés: ' + ($('selectionType').value === 'part' ? 'alkatrész' : 'szekrény');
  renderer.domElement.style.cursor = measureEnabled ? 'crosshair' : 'pointer';
+ if (!measureEnabled) hoveredSnap=null;
  invalidate();
 }
+renderer.domElement.addEventListener('pointermove', event => {
+ if (!measureEnabled || event.buttons) return;
+ hoveredSnap=pickFeature(event);
+ $('snapHint').textContent=hoveredSnap ? (hoveredSnap.type==='corner' ? 'Sarokpont – kattintás: méretpont' : 'Él – kattintás: teljes élhossz') : 'Közelíts egy látható sarokponthoz vagy élhez.';
+ invalidate();
+});
+renderer.domElement.addEventListener('pointerleave', () => { hoveredSnap=null; invalidate(); });
+$('measureMode').addEventListener('change', renderMeasure);
 renderer.domElement.addEventListener('pointerdown', event => {
  activePointer = { x: event.clientX, y: event.clientY, button: event.button };
 });
@@ -1191,12 +1237,16 @@ renderer.domElement.addEventListener('pointerup', event => {
   if (!hit) notify('Nincs kijelölt elem. Kattints egy látható szekrényre vagy alkatrészre.');
   return;
  }
- const point = pickPoint(event);
- if (!point) { notify('Kattints a modell látható felületére.'); return; }
- if (snapPoints.length >= 2) snapPoints = [];
- snapPoints.push(point);
+ const snap=pickFeature(event);
+ if (!snap) { notify('Csak valódi él vagy sarokpont választható ki. Nagyíts rá.'); return; }
+ hoveredSnap=snap;
+ if (snap.type==='edge') snapPoints=[snap.a.clone(),snap.b.clone()];
+ else {
+  if (snapPoints.length>=2) snapPoints=[];
+  snapPoints.push(snap.point.clone());
+ }
  renderMeasure();
- if (snapPoints.length === 2) notify('Távolság: ' + format(snapPoints[0].distanceTo(snapPoints[1]) * mmPerUnit) + ' mm');
+ if (snapPoints.length===2) notify('Mért hossz: '+format(measuredDistance()*mmPerUnit)+' mm');
 });
 $('selectionType').addEventListener('change', () => { refreshSelection(); toggleMeasure(false); });
 $('clearSelection').addEventListener('click', clearSelection);
@@ -1289,7 +1339,7 @@ $('finishStyle').addEventListener('change', applyScnFinish);
 $('copyMeasure').addEventListener('click', async () => {
  if (snapPoints.length !== 2) return notify('Előbb jelölj ki két pontot!');
  const [a,b] = snapPoints;
- const content = `JOB Viewer mérés\nA: ${formatPoint(a)}\nB: ${formatPoint(b)}\nTávolság: ${format(a.distanceTo(b)*mmPerUnit)} mm\nΔX: ${format(Math.abs(a.x-b.x)*mmPerUnit)} mm\nΔY: ${format(Math.abs(a.y-b.y)*mmPerUnit)} mm\nΔZ: ${format(Math.abs(a.z-b.z)*mmPerUnit)} mm`;
+ const content = `JOB Viewer mérés\nA: ${formatPoint(a)}\nB: ${formatPoint(b)}\nTávolság: ${format(measuredDistance()*mmPerUnit)} mm\nΔX: ${format(Math.abs(a.x-b.x)*mmPerUnit)} mm\nΔY: ${format(Math.abs(a.y-b.y)*mmPerUnit)} mm\nΔZ: ${format(Math.abs(a.z-b.z)*mmPerUnit)} mm`;
  try { await navigator.clipboard.writeText(content); notify('Mérési adatok másolva.'); }
  catch { notify('Másolás nem támogatott ezen a címen (használj localhost-ot vagy HTTPS-t).'); }
 });
