@@ -59,3 +59,16 @@ assert 'hoveredSnap.type' in js
 assert 'for="fileInput" class="start-open"' in html
 assert 'Nyisson meg egy fájlt!' in html
 assert 'Nyiss meg egy SCN fájlt' not in html
+
+# Multiple measurements keep their own points/mode, can be removed independently,
+# and the PNG includes an SVG annotation layer composited over WebGL pixels.
+for control in ("freezeMeasure", "clearSavedMeasures", "savedMeasureList", "exportPng"):
+    assert control in html and control in js, control
+assert "savedMeasures.push({" in js
+assert "points:snapPoints.map(p=>p.clone())" in js
+assert "savedMeasures.splice(index,1)" in js
+assert "savedMeasures = [];" in js
+assert "drawDimension(add, width, height, item.points, item.mode, true)" in js
+assert "function exportPngWithOverlay()" in js
+assert "ctx.drawImage(source,0,0)" in js and "ctx.drawImage(overlay,0,0,output.width,output.height)" in js
+assert "'image/png'" in js and "new XMLSerializer().serializeToString(clone)" in js
