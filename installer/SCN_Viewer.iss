@@ -1,5 +1,5 @@
-#define MyAppName "SCN Viewer"
-#define MyAppVersion "2.3.0"
+#define MyAppName "JOB Viewer"
+#define MyAppVersion "2.4.0"
 #define MyAppPublisher "kissjaniapp"
 #define MyAppURL "https://github.com/kissjaniapp/scn_viewer"
 
@@ -13,12 +13,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/actions
-DefaultDirName={localappdata}\Programs\SCN Viewer
-DefaultGroupName=SCN Viewer
+DefaultDirName={localappdata}\Programs\JOB Viewer
+DefaultGroupName=JOB Viewer
 DisableProgramGroupPage=yes
-UninstallDisplayIcon={app}\SCN Viewer.exe
+UninstallDisplayIcon={app}\JOB Viewer.exe
 OutputDir=..\output
-OutputBaseFilename=SCN_Viewer_v{#MyAppVersion}_Telepito
+OutputBaseFilename=JOB_Viewer_v{#MyAppVersion}_Telepito
 SetupIconFile=SCNViewer.ico
 Compression=lzma2
 SolidCompression=yes
@@ -52,8 +52,8 @@ Type: files; Name: "{app}\resources\Build_KitchenDraw_Bridge.ps1"
 Type: files; Name: "{app}\resources\Build_KitchenDraw_Bridge.bat"
 
 [Icons]
-Name: "{autoprograms}\SCN Viewer\SCN Viewer"; Filename: "{app}\SCN Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"
-Name: "{autodesktop}\SCN Viewer"; Filename: "{app}\SCN Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"; Tasks: desktopicon
+Name: "{autoprograms}\JOB Viewer\JOB Viewer"; Filename: "{app}\JOB Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"
+Name: "{autodesktop}\JOB Viewer"; Filename: "{app}\JOB Viewer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\SCNViewer.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\SCN Viewer.exe"; Description: "SCN Viewer indítása"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\JOB Viewer.exe"; Description: "JOB Viewer indítása"; Flags: postinstall nowait skipifsilent
