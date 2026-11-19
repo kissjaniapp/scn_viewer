@@ -142,3 +142,7 @@ body.model-only-mode #viewport #toast{display:none!important}
 .saved-measure-item .saved-measure-delete{background:#633039;border:1px solid #b46b74;color:#fff;font-weight:700;min-width:76px}
 .saved-measure-item .saved-measure-delete:hover{background:#923b47;border-color:#f09ba6}
 .saved-measure-item .saved-measure-delete:focus-visible{outline:2px solid #ffb4bd;outline-offset:2px}
+
+/* JOB Viewer 2.5 - consistent branding in the title bar and file picker */
+.brand-logo{width:42px;height:42px;object-fit:contain;flex:none;border-radius:10px;vertical-align:middle}
+.welcome-logo{width:116px;height:116px;object-fit:contain;filter:drop-shadow(0 9px 22px rgba(0,224,244,.24))}
