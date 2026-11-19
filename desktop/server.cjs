@@ -94,7 +94,7 @@ async function createLocalServer({ viewerDir, dataDir } = {}) {
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
-        'Content-Security-Policy': "default-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'",
+        'Content-Security-Policy': "default-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'",
       });
       fs.createReadStream(pathnameOnDisk).on('error', () => res.destroy()).pipe(res);
     } catch { reply(res, 500, 'Hiányzik egy telepített fájl.'); }
