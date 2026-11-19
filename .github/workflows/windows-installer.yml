@@ -1,4 +1,4 @@
-name: SCN Viewer - Windows telepítő
+name: JOB Viewer - Windows telepítő
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
       - name: Offline 3D felület készítése
         run: npm run build
 
-      - name: SCN Viewer ikon készítése
+      - name: JOB Viewer ikon készítése
         run: python tools/make_icon.py
 
       - name: Önálló Windows alkalmazás csomagolása (Electron)
@@ -41,7 +41,7 @@ jobs:
         run: |
           npm run package:win
           if ($LASTEXITCODE -ne 0) { throw 'Electron packaging failed' }
-          $app = 'packed/win-unpacked/SCN Viewer.exe'
+          $app = 'packed/win-unpacked/JOB Viewer.exe'
           if (-not (Test-Path $app)) { throw 'Desktop executable not found' }
           if ((Get-Item $app).Length -lt 10000000) { throw 'Invalid desktop executable size' }
           if (-not (Test-Path 'packed/win-unpacked/resources/app.asar')) { throw 'Missing Electron application archive' }
@@ -57,14 +57,14 @@ jobs:
           if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler not found' }
           & $compiler installer/SCN_Viewer.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup error: $LASTEXITCODE" }
-          if (-not (Test-Path 'output/SCN_Viewer_v2.3.0_Telepito.exe')) { throw 'Installer missing' }
+          if (-not (Test-Path 'output/JOB_Viewer_v2.4.0_Telepito.exe')) { throw 'Installer missing' }
           Get-ChildItem output/*.exe | Select-Object Name,Length
 
       - name: EXE telepítő az Artifacts részbe
         uses: actions/upload-artifact@v4
         with:
-          name: SCN_Viewer_v2.3.0_Telepito
-          path: output/SCN_Viewer_v2.3.0_Telepito.exe
+          name: JOB_Viewer_v2.4.0_Telepito
+          path: output/JOB_Viewer_v2.4.0_Telepito.exe
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
