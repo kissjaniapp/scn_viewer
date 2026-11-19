@@ -6,6 +6,8 @@
   <meta name="color-scheme" content="dark"/>
   <title>JOB Viewer – 3D nézegető és méretező</title>
   <link rel="stylesheet" href="./style.css"/>
+  <link rel="icon" type="image/svg+xml" href="./job-viewer-logo.svg"/>
+  <script defer src="./occt-import-js.js"></script>
   <script type="importmap">
   {
     "imports": {
@@ -17,10 +19,10 @@
 </head>
 <body>
  <header class="topbar">
-  <div class="brand-line"><span class="symbol">▣</span><strong>JOB Viewer v2.4.0</strong><span class="title-sep">—</span><span id="filename" class="filename">Nincs megnyitott fájl</span></div>
+  <div class="brand-line"><img class="brand-logo" src="./job-viewer-logo.svg" alt="JOB Viewer logó"/><strong>JOB Viewer v2.5.0</strong><span class="title-sep">—</span><span id="filename" class="filename">Nincs megnyitott fájl</span></div>
   <nav class="topactions" aria-label="Fő eszköztár">
    <label class="file-button primary" for="fileInput">📂 Megnyitás</label>
-   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.skp" multiple hidden/>
+   <input id="fileInput" type="file" accept=".obj,.3ds,.stl,.glb,.gltf,.scn,.skp,.3mf,.step,.stp,.f3d" multiple hidden/>
    <button id="resetView">⤢ Teljes nézet</button>
    <button id="enterModelOnly" title="Csak a modell megjelenítése teljes képernyőn">⛶ Csak modell</button>
    <button id="toggleTree">☷ Szerkezet</button>
@@ -33,14 +35,14 @@
   <aside class="sidebar structure-sidebar" id="structureSidebar">
    <div class="panel-header">Szerkezet <span id="treeCount"></span></div>
    <div class="tree-actions"><button id="expandTree">Mind kinyitása</button><button id="collapseTree">Összecsukás</button></div>
-   <div id="structureTree" class="structure-tree" role="tree" aria-label="SCN szerkezet"><p class="hint">Nyiss meg egy SCN vagy SKP fájlt.</p></div>
+   <div id="structureTree" class="structure-tree" role="tree" aria-label="SCN szerkezet"><p class="hint">Nyiss meg egy 3D-modellt.</p></div>
    <div class="tree-notice">A fa az SCN-ből felismerhető objektumokat mutatja. A térbeli csoportok becslések, nem igazolt bútoregységek.</div>
   </aside>
   <main class="viewport-wrapper">
    <div id="viewport" aria-label="Forgatható 3D nézet">
     <button id="exitModelOnly" class="model-only-exit" hidden title="Vissza a szerkesztő nézethez (Esc)">↩ Vissza <span>Esc</span></button>
     <div class="scene-overlay"><span id="modeStatus" class="tag">Kijelölés: szekrény</span><span id="coordStatus">3D nézet</span></div>
-    <div id="emptyState" class="empty-state"><label for="fileInput" class="start-open" title="Fájl megnyitása"><span class="cube-icon">⬡</span><strong class="start-heading">Nyisson meg egy fájlt!</strong><span class="start-description">Kattints ide a fájl kiválasztásához, vagy húzd a 3D-fájlt az ablakba.</span><span class="start-action">📂 Fájl kiválasztása</span></label><p class="secondary">Támogatott formátumok: SCN, SKP, OBJ, 3DS, STL, GLB és GLTF.</p></div>
+    <div id="emptyState" class="empty-state"><label for="fileInput" class="start-open" title="Fájl megnyitása"><img class="welcome-logo" src="./job-viewer-logo.svg" alt="" /><strong class="start-heading">Nyisson meg egy fájlt!</strong><span class="start-description">Kattints ide a fájl kiválasztásához, vagy húzd a 3D-fájlt az ablakba.</span><span class="start-action">📂 Fájl kiválasztása</span></label><p class="secondary">Támogatott formátumok: SCN, SKP, 3MF, STEP/STP, OBJ, 3DS, STL, GLB, GLTF. F3D esetén Fusionból STEP-export szükséges.</p></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <div class="orbit-help">Jobb egér: forgatás · Görgő: nagyítás · Benyomott görgő: mozgatás</div>
     <div class="axis-label">Z ↑ &nbsp; Y ↗ &nbsp; X →</div>
