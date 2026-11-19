@@ -98,7 +98,7 @@
    <p class="hint">A méretezéshez a helyes egységarány szükséges. Ha a modell milliméteres, maradjon 1.</p>
    <div class="form-row"><label for="upAxis">Függőleges tengely</label><select id="upAxis"><option value="Z">Z – KitchenDraw / CAD</option><option value="Y">Y – általános 3D</option></select></div>
    <label class="check"><input type="checkbox" id="showGrid"/> Segédrács</label>
-   <label class="check"><input type="checkbox" id="showAxes" checked/> X–Y–Z tengelyek megjelenítése</label>
+   <label class="check"><input type="checkbox" id="showAxes"/> X–Y–Z tengelyek megjelenítése</label>
    <label class="check"><input type="checkbox" id="showEdges"/> Lapélek kiemelése</label>
   </section>
 
@@ -116,7 +116,9 @@
      <section class="measure-section">
    <div class="section-title">Méretezés két pont között</div>
    <button id="measureToggle" class="measure-button">📏 Mérés bekapcsolása</button>
-   <div class="hint">Bekapcsolva a bal egérgomb két mérőpontot jelöl ki a szekrényen vagy alkatrészen. A jobb gombbal ilyenkor is forgathatod a nézetet.</div>
+   <div class="hint">Vidd az egeret sarokra vagy élre: a kis négyzet vagy a kiemelt él pontosan mutatja a választást. Sarokra kattintva két pontot, élre kattintva annak teljes hosszát méred. Jobb egérgomb: forgatás.</div>
+   <div class="form-row"><label for="measureMode">Mérési mód</label><select id="measureMode"><option value="free">Szabad – valódi 3D táv</option><option value="ortho">Orto – automatikus tengely</option><option value="x">Orto – X irány</option><option value="y">Orto – Y irány</option><option value="z">Orto – Z irány</option></select></div>
+   <div id="snapHint" class="hint" aria-live="polite">Vidd az egeret egy látható élre vagy sarokra.</div>
    <div class="points"><div><small>1. pont</small><span id="pointA">Nincs</span></div><div><small>2. pont</small><span id="pointB">Nincs</span></div></div>
    <div class="result"><span>Térbeli távolság</span><strong id="distance">– mm</strong></div>
    <div class="delta"><div>ΔX <strong id="dx">–</strong></div><div>ΔY <strong id="dy">–</strong></div><div>ΔZ <strong id="dz">–</strong></div></div>
