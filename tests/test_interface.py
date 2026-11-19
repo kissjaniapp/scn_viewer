@@ -36,3 +36,11 @@ assert ".skp" in (root / "index.html").read_text(encoding="utf-8")
 assert "decodeSkpToGlb" in js
 assert "correctedPosition" in js and "showScnEnvelopeWarnings" in js
 print("OK: user controls, pickers, measurement, XYZ placement, render-on-demand, IDs")
+
+# Drafting measurements use a world-anchored SVG overlay, not large 3D spheres.
+assert "function renderDimensionOverlay()" in js
+assert "document.createElementNS('http://www.w3.org/2000/svg', 'svg')" in js
+assert "renderDimensionOverlay();" in js
+assert "new THREE.SphereGeometry(r" not in js
+assert "bestDist = 7" in js and "bestEdgeDist = 6" in js
+assert "JOB Viewer" in (root / "index.html").read_text(encoding="utf-8")
