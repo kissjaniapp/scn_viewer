@@ -20,7 +20,7 @@ def main():
     directory = bytearray()
     offset = 6 + 16 * len(files)
     for size, blob in files:
-        if blob[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+        if blob[:8] != b"\x89PNG\r\n\x1a\n":
             raise ValueError(f"Nem PNG ikon: {size}")
         directory.extend(struct.pack("<BBBBHHII", size % 256, size % 256,
                                      0, 0, 1, 32, len(blob), offset))
