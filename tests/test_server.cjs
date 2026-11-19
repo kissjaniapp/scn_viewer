@@ -19,6 +19,13 @@ test('Native SCN Viewer desktop server: static-only and loopback', async t => {
  t.after(async () => { await new Promise(resolve=>server.close(resolve)); await fs.rm(tmp,{recursive:true,force:true}); });
  const page = await fetch(url);
  assert.equal(page.status, 200);
+ const policy=page.headers.get('content-security-policy');
+ assert.ok(policy, 'Desktop must set a Content-Security-Policy');
+ assert.match(policy,/script-src 'self' 'wasm-unsafe-eval'/,
+  'Allow native WASM CAD compilation without permitting arbitrary JS eval');
+ assert.doesNotMatch(policy,/script-src[^;]*'unsafe-eval'/,
+  'Do not enable unrestricted JavaScript eval');
+
  assert.match(await page.text(), /SCN Viewer/);
  assert.equal((await fetch(url+'main.js')).status, 200);
  assert.equal((await fetch(url+'style.css')).status, 200);
