@@ -1,4 +1,4 @@
-"""Generate a small multiresolution SCN Viewer Windows icon with stdlib only."""
+"""Generate the multiresolution JOB Viewer Windows icon with stdlib only."""
 from pathlib import Path
 import math
 import struct
@@ -23,31 +23,51 @@ def inside_polygon(x, y, polygon):
 
 
 def pixel(x, y):
-    # Design is scaled to the 256 x 256 artboard in the source SVG-style layout.
-    if 13 <= x <= 243 and 13 <= y <= 243:
-        r = 50
-        corner = (13+r if x < 13+r else 243-r if x > 243-r else x,
-                  13+r if y < 13+r else 243-r if y > 243-r else y)
-        if math.hypot(x-corner[0],y-corner[1]) <= r:
-            color = (18, 30, 49, 255)
-        else:
-            return (0, 0, 0, 0)
-    else:
+    # The native Windows icon follows the JOB Viewer vector brand:
+    # dark rounded tile, cyan CAD cabinet, steel J and amber measure ticks.
+    if not (10 <= x <= 246 and 10 <= y <= 246):
         return (0, 0, 0, 0)
-    faces = [
-        ([(68,78),(139,46),(204,79),(134,111)], (30,121,147,255)),
-        ([(68,78),(134,111),(134,185),(68,149)], (18,82,116,255)),
-        ([(134,111),(204,79),(204,152),(134,185)], (25,97,130,255)),
+    radius = 43
+    cx = 10+radius if x < 10+radius else 246-radius if x > 246-radius else x
+    cy = 10+radius if y < 10+radius else 246-radius if y > 246-radius else y
+    distance = math.hypot(x-cx,y-cy)
+    if distance > radius:
+        return (0, 0, 0, 0)
+    color=(12,30,46,255)
+    if distance > radius - 5:
+        color=(20,207,225,255)
+    panel_front=[(44,65),(125,104),(125,178),(44,137)]
+    panel_side=[(125,104),(202,65),(202,139),(125,178)]
+    panel_top=[(44,65),(120,28),(202,65),(125,104)]
+    for polygon, shade in ((panel_top,(28,85,104,255)),
+                            (panel_front,(17,64,81,255)),
+                            (panel_side,(190,130,69,255))):
+        if inside_polygon(x,y,polygon):
+            color=shade
+    outlines=[
+        ((44,65),(120,28)),((120,28),(202,65)),((202,65),(125,104)),
+        ((125,104),(44,65)),((44,65),(44,137)),((44,137),(125,178)),
+        ((125,178),(202,139)),((202,139),(202,65)),((125,104),(125,178)),
+        ((58,85),(111,112)),((111,112),(111,154)),((111,154),(58,126))
     ]
-    for poly, shade in faces:
-        if inside_polygon(x,y,poly): color=shade
-    edges=[((68,78),(134,111)),((134,111),(204,79)),((134,111),(134,185)),
-           ((68,78),(68,149)),((68,149),(134,185)),((134,185),(204,152)),((204,152),(204,79))]
-    if any(line_distance(x,y,*a,*b)<3.5 for a,b in edges): color=(129,222,237,255)
-    ruler=[((59,200),(196,200)),((59,188),(59,213)),((196,188),(196,213))]
-    if any(line_distance(x,y,*a,*b)<3 for a,b in ruler): color=(251,194,88,255)
+    if any(line_distance(x,y,*a,*b)<2.8 for a,b in outlines):
+        color=(35,228,240,255)
+    # Steel J in the foreground: tall stem and curved base.
+    j=[((127,71),(127,143)),((127,143),(114,157)),((114,157),(98,158)),
+       ((98,158),(83,151))]
+    if any(line_distance(x,y,*a,*b)<8 for a,b in j):
+        color=(178,236,251,255)
+    rulers=[
+        ((222,76),(222,139)),((214,76),(230,76)),((214,139),(230,139)),
+        ((45,193),(200,193)),((45,186),(45,202)),((200,186),(200,202))
+    ]
+    if any(line_distance(x,y,*a,*b)<2.8 for a,b in rulers):
+        color=(255,196,72,255)
+    # Small high-contrast label even at 64px.
+    if 206 <= y <= 217 and 87 <= x <= 169:
+        if (x//5+y//3) % 3 != 0:
+            color=(228,248,253,255)
     return color
-
 
 def image_data(size):
     # 32-bit BMP DIB inside an ICO, with AND mask for transparent background.
@@ -67,13 +87,13 @@ def image_data(size):
 
 
 def main():
-    sizes=(16,32,48,64)
+    sizes=(16,32,48,64,128,256)
     images=[image_data(size) for size in sizes]
     offset=6+16*len(sizes)
     header=struct.pack('<HHH',0,1,len(sizes))
     directory=bytearray()
     for size, blob in zip(sizes,images):
-        directory.extend(struct.pack('<BBBBHHII',size,size,0,0,1,32,len(blob),offset))
+        directory.extend(struct.pack('<BBBBHHII',size % 256,size % 256,0,0,1,32,len(blob),offset))
         offset+=len(blob)
     destination=Path(__file__).resolve().parent.parent/'installer'/'SCNViewer.ico'
     destination.write_bytes(header+directory+b''.join(images))
