@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="JOB Viewer - precíz 3D bútormodell és méretezés">
+ <defs>
+  <linearGradient id="bg" x2=".8" y2="1"><stop stop-color="#14374d"/><stop offset="1" stop-color="#081420"/></linearGradient>
+  <linearGradient id="steel" x2=".8" y2="1"><stop stop-color="#eafaff"/><stop offset=".55" stop-color="#62d8ee"/><stop offset="1" stop-color="#247b9f"/></linearGradient>
+  <linearGradient id="wood" x2="1" y2=".8"><stop stop-color="#b97b43"/><stop offset=".5" stop-color="#dfad66"/><stop offset="1" stop-color="#845027"/></linearGradient>
+ </defs>
+ <rect x="6" y="6" width="244" height="244" rx="46" fill="url(#bg)" stroke="#13d7ed" stroke-width="6"/>
+ <path d="M44 63 119 28 200 66 125 106Z" fill="#17485a" stroke="#43e6f5" stroke-width="4"/>
+ <path d="M44 63 125 106 125 178 44 136Z" fill="#103e52" stroke="#36d9ec" stroke-width="4"/>
+ <path d="M125 106 200 66 200 137 125 178Z" fill="url(#wood)" stroke="#21d8ed" stroke-width="4"/>
+ <path d="M57 81 112 109 112 155 57 128Z" fill="#0c2333" stroke="#4bbed2" stroke-width="2"/>
+ <path d="M57 109 112 135" stroke="#81d8e6" stroke-width="5"/>
+ <path d="M126 69 126 142Q125 164 108 164L84 153" fill="none" stroke="url(#steel)" stroke-width="16" stroke-linecap="square"/>
+ <path d="M215 73H231M223 73V139M215 139H231" fill="none" stroke="#ffca58" stroke-width="4"/>
+ <path d="m223 74-6 9h12zM223 139l-6-9h12z" fill="#ffca58"/>
+ <path d="M44 187V197M199 187V197M44 193H199M44 193l12-6v12zM199 193l-12-6v12z" stroke="#ffca58" fill="none" stroke-width="3"/>
+ <text x="128" y="225" font-family="Arial,sans-serif" font-size="28" font-weight="900" fill="#effbff" text-anchor="middle" letter-spacing="3">JOB</text>
+ <text x="128" y="240" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#24e3ed" text-anchor="middle" letter-spacing="4">VIEWER</text>
+</svg>
