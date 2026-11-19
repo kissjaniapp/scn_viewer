@@ -27,3 +27,11 @@ html = html.replace(importMap, '');
 await writeFile(path.join(dist, 'viewer/index.html'), html, 'utf8');
 await cp(path.join(root, 'viewer/style.css'), path.join(dist, 'viewer/style.css'));
 console.log('Offline Windows application staged in dist/.');
+
+// OCCT STEP reader: copy its JavaScript and WebAssembly for fully offline use.
+for (const filename of ['occt-import-js.js', 'occt-import-js.wasm']) {
+ await cp(path.join(root,'node_modules','occt-import-js','dist',filename),
+          path.join(dist,'viewer',filename));
+}
+await cp(path.join(root,'viewer','job-viewer-logo.svg'),
+         path.join(dist,'viewer','job-viewer-logo.svg'));
