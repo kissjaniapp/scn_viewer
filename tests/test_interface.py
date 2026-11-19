@@ -54,3 +54,8 @@ assert 'new THREE.EdgesGeometry(geo,1)' in js
 assert 'function measurementAxis()' in js and 'function measuredDistance()' in js
 assert "addEventListener('pointermove'" in js
 assert 'hoveredSnap.type' in js
+
+# Welcome area opens the same file picker as the toolbar.
+assert 'for="fileInput" class="start-open"' in html
+assert 'Nyisson meg egy fájlt!' in html
+assert 'Nyiss meg egy SCN fájlt' not in html
