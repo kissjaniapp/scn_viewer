@@ -1,4 +1,5 @@
 import { decodeScn } from './scn-parser.js';
+import { uncheckedRoots, countMeshes } from './model-edit.js';
 import { decodeSkpToGlb } from './skp-loader.js';
 import { readStep } from './step-loader.js';
 import { classifyScnRecord } from './scn-layout.js';
@@ -12,6 +13,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { TDSLoader } from 'three/addons/loaders/TDSLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 
 const $ = (id) => document.getElementById(id);
@@ -276,6 +278,8 @@ function disposeModel() {
  scnMaterials=null;
  model = null;
  modelBox = null;
+ $('saveFilteredModel').disabled=true;
+ $('deleteUnchecked').disabled=true;
 }
 function prepareModel(group, name) {
  disposeModel();
@@ -283,6 +287,7 @@ function prepareModel(group, name) {
  partSizeCache = new WeakMap();
  meshCountCache = new WeakMap();
  model = group;
+ $('saveFilteredModel').disabled=false;
  const native = model.userData.scnState;
  scnLayout = native ? {data:native.data,layout:native.layout} : null;
  hiddenObjects.clear();
@@ -532,6 +537,7 @@ function refreshHiddenObjects() {
  if(!list) return;
  list.replaceChildren();
  $('showAllObjects').disabled=hiddenObjects.size===0;
+ $('deleteUnchecked').disabled=!model || !uncheckedRoots(model,hiddenObjects).length;
  if(!hiddenObjects.size) {
   const hint=document.createElement('p');
   hint.className='hint'; hint.textContent='Nincs elrejtett elem.';
@@ -563,6 +569,118 @@ function hideSelectedObject() {
  renderStructureTree();
  notify('Elrejtve: '+(object.userData?.cabinetName||object.userData?.partName||object.name));
 }
+
+// Remove only unchecked nodes from the in-memory drawing, not its source file.
+// Parent removal includes all descendants; individual hidden children remain
+// independently removable even in nested SCN/SketchUp assemblies.
+function deleteUncheckedObjects() {
+ if(!model) return notify('Előbb nyiss meg egy rajzot!');
+ const roots=uncheckedRoots(model,hiddenObjects);
+ if(!roots.length) return notify('Nincs kikapcsolt objektum.');
+ const meshCount=countMeshes(roots);
+ const question=`Végleg eltávolítod az aktuális rajzból a ${roots.length} kikapcsolt ágat (${meshCount} 3D objektum)?\\n\\nAz eredeti fájl nem változik. A visszaállításhoz újra kell nyitnod azt.`;
+ if(!window.confirm(question)) return;
+ const removedObjects=new Set();
+ for(const root of roots) root.traverse(child=>removedObjects.add(child));
+ clearSelection();
+ clearMeasure();
+ savedMeasures=[];
+ refreshSavedMeasureList();
+ clearEdges();
+ for(const obj of roots) obj.parent?.remove(obj);
+ for(const obj of removedObjects) {
+  hiddenObjects.delete(obj);
+  treeNodeElements.delete(obj);
+ }
+ // SCN has secondary record and region maps. Prune them as well, otherwise
+ // rebuilding the tree would resurrect already deleted references.
+ if(model.userData.nativeScn) {
+  for(const [id,obj] of scnRecordMeshes) if(removedObjects.has(obj)) {
+   scnRecordMeshes.delete(id);
+   delete scnCorrections[id];
+  }
+  for(const [id,obj] of scnRegionGroups) if(removedObjects.has(obj) || !obj.parent) scnRegionGroups.delete(id);
+  if(scnLayout?.data?.entries) scnLayout.data.entries=scnLayout.data.entries.filter(record=>scnRecordMeshes.has(record.id));
+  if(model.userData.scnState?.data) model.userData.scnState.data=scnLayout.data;
+ }
+ // The root is never deleted: the user can keep working and save the result.
+ model.visible=true;
+ hiddenObjects.clear();
+ model.updateWorldMatrix(true,true);
+ boundsCache=new WeakMap();
+ partSizeCache=new WeakMap();
+ meshCountCache=new WeakMap();
+ refreshHiddenObjects();
+ if(model.userData.nativeScn) setScnVisible({refit:false});
+ else {renderStructureTree();refitCameraToVisibleObjects();}
+ toggleEdges($('showEdges').checked);
+ $('fileHint').textContent=`${meshCount} kikapcsolt 3D objektum törölve a munkapéldányból. Mentsd a megmaradókat GLB-be; az eredeti fájl nem módosult.`;
+ notify(`Törölve: ${meshCount} 3D objektum. A kiválogatott rajz menthető.`);
+}
+
+// Build a clean export hierarchy instead of exporting Viewer overlays,
+// SCN reconstruction metadata, hidden meshes or selection helpers.
+function cloneGeometryForExport(source) {
+ if(!isVisibleInHierarchy(source)) return null;
+ if(modelEdges.includes(source) || source.userData?.scnOutline) return null;
+ let clone;
+ if(source.isInstancedMesh) {
+  clone=new THREE.InstancedMesh(source.geometry,source.material,source.count);
+  clone.instanceMatrix.copy(source.instanceMatrix);
+  if(source.instanceColor) clone.instanceColor=source.instanceColor.clone();
+ } else if(source.isMesh) clone=new THREE.Mesh(source.geometry,source.material);
+ else if(source.isLineSegments) clone=new THREE.LineSegments(source.geometry,source.material);
+ else if(source.isLine) clone=new THREE.Line(source.geometry,source.material);
+ else clone=new THREE.Group();
+ clone.name=source.name||'3D objektum';
+ clone.position.copy(source.position);
+ clone.quaternion.copy(source.quaternion);
+ clone.scale.copy(source.scale);
+ clone.matrixAutoUpdate=source.matrixAutoUpdate;
+ if(!source.matrixAutoUpdate) clone.matrix.copy(source.matrix);
+ for(const child of source.children) {
+  const newChild=cloneGeometryForExport(child);
+  if(newChild)clone.add(newChild);
+ }
+ // Drop empty groups, but preserve a named mesh itself.
+ if(!clone.isMesh && !clone.isLine && clone.children.length===0) return null;
+ return clone;
+}
+async function saveFilteredModel() {
+ if(!model) return notify('Előbb nyiss meg egy rajzot!');
+ const btn=$('saveFilteredModel');
+ btn.disabled=true;
+ try {
+  const root=cloneGeometryForExport(model);
+  if(!root) throw new Error('Nincs megmaradt, látható 3D geometria a mentéshez.');
+  const wrapper=new THREE.Group();
+  wrapper.name='JOB Viewer – kiválogatott modell';
+  // glTF uses metres and Y-up. Keep exact millimetre dimensions when
+  // opening the exported GLB in JOB Viewer or another glTF CAD viewer.
+  wrapper.scale.setScalar(mmPerUnit/1000);
+  if(upAxis==='Z') wrapper.rotation.x=-Math.PI/2;
+  wrapper.add(root);
+  const blobData=await new GLTFExporter().parseAsync(wrapper,{
+   binary:true,onlyVisible:true,trs:true,maxTextureSize:4096
+  });
+  if(!(blobData instanceof ArrayBuffer)||blobData.byteLength<20) throw new Error('Nem jött létre érvényes GLB.');
+  const url=URL.createObjectURL(new Blob([blobData],{type:'model/gltf-binary'}));
+  try {
+   const link=document.createElement('a');
+   const name=(originName||'rajz').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,75);
+   link.href=url;
+   link.download=`${name}_kivalogatott.glb`;
+   document.body.appendChild(link);
+   link.click();
+   link.remove();
+  } finally {setTimeout(()=>URL.revokeObjectURL(url),30000);}
+  notify('A kiválogatott rajz GLB formátumban mentve. STEP export még nem támogatott.');
+ } catch(error) {
+  console.error('GLB mentési hiba',error);
+  notify('A kiválogatott modell mentése sikertelen: '+(error?.message||String(error)));
+ } finally {btn.disabled=!model;}
+}
+
 function selectedScnRecord() {
  if (!model?.userData.nativeScn || !selectedMesh) return null;
  const record = selectedMesh.userData.scnRecord;
@@ -1384,6 +1502,8 @@ $('measureToolbar').addEventListener('click', ()=>toggleMeasure());
 $('toggleSettings').addEventListener('click', ()=>{$('advancedSettings').open=!$('advancedSettings').open;});
 $('showAllToolbar').addEventListener('click', ()=>{$('showAllObjects').click();});
 $('hideSelected').addEventListener('click', hideSelectedObject);
+$('deleteUnchecked').addEventListener('click',deleteUncheckedObjects);
+$('saveFilteredModel').addEventListener('click',saveFilteredModel);
 $('showAllObjects').addEventListener('click', () => {
  for(const object of hiddenObjects) object.visible=true;
  hiddenObjects.clear();
