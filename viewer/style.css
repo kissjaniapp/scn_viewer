@@ -146,3 +146,9 @@ body.model-only-mode #viewport #toast{display:none!important}
 /* JOB Viewer 2.5 - consistent branding in the title bar and file picker */
 .brand-logo{width:42px;height:42px;object-fit:contain;flex:none;border-radius:10px;vertical-align:middle}
 .welcome-logo{width:116px;height:116px;object-fit:contain;filter:drop-shadow(0 9px 22px rgba(0,224,244,.24))}
+
+/* Destructive model editing stays visually distinct from temporary visibility. */
+.delete-unchecked{background:#572a35;border:1px solid #b77280;color:#ffe9ed;font-weight:700}
+.delete-unchecked:not(:disabled):hover{background:#813643;border-color:#ee9ca9}
+.delete-unchecked:disabled{opacity:.45;cursor:not-allowed}
+#saveFilteredModel:disabled{opacity:.45;cursor:not-allowed}
