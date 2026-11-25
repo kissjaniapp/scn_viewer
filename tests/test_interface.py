@@ -89,4 +89,18 @@ assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
 assert "const step=await readStep(await file.arrayBuffer())" in js
 assert "Az F3D Fusion saját archívuma" in js
 assert "job-viewer-logo.svg" in html
-assert "JOB Viewer v2.5.3" in html
+assert "JOB Viewer v2.6.0" in html
+
+# Editing the working copy: delete only unchecked subtrees and export a
+# re-openable GLB, never pretend tessellated geometry is a true STEP solid.
+for element in ('deleteUnchecked','saveFilteredModel'):
+    assert f'id="{element}"' in html
+    assert f"$('{element}').addEventListener" in js
+assert "uncheckedRoots(model,hiddenObjects)" in js
+assert "countMeshes(roots)" in js
+assert "obj.parent?.remove(obj)" in js
+assert "new GLTFExporter().parseAsync" in js
+assert "wrapper.scale.setScalar(mmPerUnit/1000)" in js
+assert "wrapper.rotation.x=-Math.PI/2" in js
+assert "_kivalogatott.glb" in js
+assert "window.confirm(question)" in js
