@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { OccSession } from 'occt.ts';
-import { analyzeRectangularPrism, boxWorldTransform } from './step-boxes.js';
+import { analyzeRectangularPrism, boxWorldPrism } from './step-boxes.js';
 
 let activeSession = null;
 const wasmPath = new URL('./occtjs.wasm', import.meta.url).href;
@@ -94,15 +94,20 @@ export async function writeReconstructedBoxStep(model,visible,mmPerUnit) {
    throw new Error(`A(z) "${mesh.name||'ismeretlen'}" csak becsült vagy katalógusgeometria, ezért nem alakítható hiteles STEP-testté.`);
   const box=analyzeRectangularPrism(mesh.geometry);
   if(!box) throw new Error(`A(z) "${mesh.name||'ismeretlen'}" nem igazolt teljes téglatest (pl. kivágás, görbe vagy hiányos felület). Pontatlan STEP helyett az export megszakadt.`);
-  const pose=boxWorldTransform(mesh.matrixWorld,box,mmPerUnit);
-  if(!pose) throw new Error(`A(z) "${mesh.name||'ismeretlen'}" nem támogatott transzformációjú.`);
-  validated.push({name:mesh.userData.partName||mesh.name||'Alkatrész',...pose});
+  const prism=boxWorldPrism(mesh.matrixWorld,box,mmPerUnit);
+  if(!prism) throw new Error(`A(z) "${mesh.name||'ismeretlen'}" degenerált, projektív vagy nulla térfogatú transzformációjú.`);
+  validated.push({name:mesh.userData.partName||mesh.name||'Alkatrész',...prism});
  }
  const session=await OccSession.create({moduleUrl:modulePath,wasmUrl:wasmPath});
  try {
-  const children=validated.map(part=>({
-   name:part.name,shape:session.makeBox(...part.size),transform:part.transform
-  }));
+  const children=validated.map(part=>{
+   // OCC creates an actual solid from the transformed quadrilateral and the
+   // world-space extrusion vector. This is exact even for negative scale,
+   // mirrors, rotations, nonuniform scale or a genuinely sheared instance.
+   const profile=session.makePolygon(part.base);
+   const solid=session.extrude(profile,part.extrusion);
+   return {name:part.name,shape:solid};
+  });
   const bytes=session.writeStepDocument([{name:'JOB Viewer – kiválogatott téglatestek',children}],{unit:'mm'});
   if(!bytes?.length) throw new Error('A STEP motor nem hozott létre fájlt.');
   return bytes;
