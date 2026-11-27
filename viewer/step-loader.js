@@ -23,7 +23,7 @@ export async function readStep(buffer) {
  const session=await OccSession.create({moduleUrl:modulePath,wasmUrl:wasmPath});
  try {
   const doc=session.readStepDocument(new Uint8Array(buffer),{unit:'mm'});
-  const count=session.documentShapeCount();
+  const count=session.documentShapeCount;
   if(!count) throw new Error('A STEP fájlban nincs megjeleníthető CAD-alkatrész.');
   const labels=leafNames(doc.tree);
   const group=new THREE.Group();
