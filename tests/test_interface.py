@@ -89,7 +89,7 @@ assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
 assert "const step=await readStep(await file.arrayBuffer())" in js
 assert "Az F3D Fusion saját archívuma" in js
 assert "job-viewer-logo.svg" in html
-assert "JOB Viewer v2.6.0" in html
+assert "JOB Viewer v2.7.0" in html
 
 # Editing the working copy: delete only unchecked subtrees and export a
 # re-openable GLB, never pretend tessellated geometry is a true STEP solid.
@@ -104,3 +104,9 @@ assert "wrapper.scale.setScalar(mmPerUnit/1000)" in js
 assert "wrapper.rotation.x=-Math.PI/2" in js
 assert "_kivalogatott.glb" in js
 assert "window.confirm(question)" in js
+
+# Fusion-compatible STEP output must use original OCCT solids, never a triangle-to-STEP rename.
+assert 'id="saveStepModel"' in html
+assert "writeFilteredStep(model,meshes)" in js
+assert "stepShapeIndex" in js
+assert "kivalogatott.step" in js
