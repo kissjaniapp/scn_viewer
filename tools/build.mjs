@@ -17,6 +17,7 @@ await build({
   target: 'es2022',
   minify: true,
   legalComments: 'eof',
+  external: ['node:*'], // unreachable Node paths in browser OCCT loader
   logLevel: 'info',
 });
 
@@ -35,3 +36,10 @@ for (const filename of ['occt-import-js.js', 'occt-import-js.wasm']) {
 }
 await cp(path.join(root,'viewer','job-viewer-logo.svg'),
          path.join(dist,'viewer','job-viewer-logo.svg'));
+
+// Exact B-Rep STEP reader/writer: keep its ESM factory and WASM as separate
+// files because the browser loads them by URL, completely offline.
+for(const filename of ['occtjs.js','occtjs.wasm']) {
+ await cp(path.join(root,'node_modules','occt.ts','dist','wasm',filename),
+          path.join(dist,'viewer',filename));
+}
