@@ -1,63 +1,81 @@
-/** Offline STEP/STP importer through the OpenCascade WebAssembly runtime.
- * The runtime is copied from the pinned npm package into the desktop bundle.
- * There is no upload and no network dependency after installation.
+/** Exact STEP B-Rep reader + writer. No lossy mesh-to-STEP conversion.
+ * OCCT shapes are kept alongside their display-only tessellations. When the
+ * user deletes hidden objects the surviving shapes are written as STEP.
  */
 import * as THREE from 'three';
+import { OccSession } from 'occt.ts';
 
-let kernelPromise = null;
-async function loadKernel() {
- if (typeof globalThis.occtimportjs !== 'function') {
-  throw new Error('A STEP CAD motor nem töltődött be. Telepítsd újra a JOB Viewert.');
+let activeSession = null;
+const wasmPath = new URL('./occtjs.wasm', import.meta.url).href;
+const modulePath = new URL('./occtjs.js', import.meta.url).href;
+function leafNames(tree, names=[]) {
+ for(const node of tree||[]) {
+  if(node.children?.length) leafNames(node.children,names);
+  else names.push(node.name||'');
  }
- kernelPromise ||= globalThis.occtimportjs({
-  locateFile: name => new URL('./' + name, import.meta.url).href
- });
- return kernelPromise;
+ return names;
 }
+
 export async function readStep(buffer) {
- if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 32) throw new Error('Üres vagy érvénytelen STEP fájl.');
- const occt = await loadKernel();
- const parsed = occt.ReadStepFile(new Uint8Array(buffer), {
-  linearUnit: 'millimeter',
-  linearDeflectionType: 'bounding_box_ratio',
-  linearDeflection: 0.002,
-  angularDeflection: 0.5
- });
- if (!parsed?.success || !parsed.meshes?.length) throw new Error('A STEP fájl nem tartalmaz megjeleníthető szilárdtest-geometriát.');
- const geometries=parsed.meshes.map((mesh,index)=>{
-  const coords=mesh.attributes?.position?.array;
-  const indices=mesh.index?.array;
-  if (!coords?.length || !indices?.length) return null;
-  const geometry=new THREE.BufferGeometry();
-  geometry.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
-  if (mesh.attributes?.normal?.array?.length===coords.length) {
-   geometry.setAttribute('normal',new THREE.Float32BufferAttribute(mesh.attributes.normal.array,3));
-  } else geometry.computeVertexNormals();
-  geometry.setIndex(indices);
-  geometry.computeBoundingBox();
-  const color=Array.isArray(mesh.color) && mesh.color.length===3
-   ? new THREE.Color().setRGB(...mesh.color) : new THREE.Color(0xa8cbd8);
-  const solid=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness:0.7,metalness:0.08,side:THREE.DoubleSide}));
-  solid.name=mesh.name||`STEP alkatrész ${index+1}`;
-  solid.userData.partName=solid.name;
-  return solid;
- });
- const root=new THREE.Group();
- root.name=parsed.root?.name||'STEP modell';
- const addNode=(node,parent)=>{
+ if(!(buffer instanceof ArrayBuffer) || buffer.byteLength<32)
+  throw new Error('Üres vagy hibás STEP fájl.');
+ // One document per opened model. Handles are not disposed until replaced.
+ const session=await OccSession.create({moduleUrl:modulePath,wasmUrl:wasmPath});
+ try {
+  const doc=session.readStepDocument(new Uint8Array(buffer),{unit:'mm'});
+  const count=session.documentShapeCount();
+  if(!count) throw new Error('A STEP fájlban nincs megjeleníthető CAD-alkatrész.');
+  const labels=leafNames(doc.tree);
   const group=new THREE.Group();
-  group.name=node.name||'Szerelési egység';
-  group.userData.cabinet=true;
-  parent.add(group);
-  for(const idx of node.meshes||[]) if(geometries[idx]) group.add(geometries[idx]);
-  for(const child of node.children||[]) addNode(child,group);
- };
- if(parsed.root) addNode(parsed.root,root);
- else for(const mesh of geometries) if(mesh) root.add(mesh);
- // Some STEP files expose a partial hierarchy. Keep any unreferenced meshes visible.
- const used=new Set();
- root.traverse(obj=>{if(obj.isMesh) used.add(obj);});
- for(const mesh of geometries) if(mesh&&!used.has(mesh)) root.add(mesh);
- if(!root.children.length) throw new Error('A STEP fájl nem tartalmaz megjeleníthető felületet.');
- return { scene:root, meshCount:geometries.filter(Boolean).length };
+  group.name='STEP CAD szerelés';
+  const shapes=[];
+  for(let i=0;i<count;i++){
+   const shape=session.documentShape(i);
+   const data=session.tessellate(shape,{linearDeflection:0.12,angularDeflection:15});
+   if(!data.positions?.length||!data.indices?.length)
+    throw new Error(`A ${i+1}. CAD-test nem háromszögelhető biztonságosan.`);
+   const geo=new THREE.BufferGeometry();
+   geo.setAttribute('position',new THREE.BufferAttribute(data.positions,3));
+   geo.setIndex(new THREE.BufferAttribute(data.indices,1));
+   geo.computeVertexNormals();
+   const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
+    color:0xabc5d6,roughness:.72,side:THREE.DoubleSide
+   }));
+   mesh.name=labels[i]||`STEP CAD-alkatrész ${i+1}`;
+   mesh.userData.stepShapeIndex=i;
+   mesh.userData.partName=mesh.name;
+   group.add(mesh);
+   shapes.push(shape);
+  }
+  group.userData.nativeStep={session,shapes,sourceUnit:'mm'};
+  activeSession=session;
+  return {scene:group,meshCount:count};
+ } catch(error) {
+  session.dispose();
+  throw error;
+ }
+}
+
+// Called only when a model is actually being disposed, not on a checkbox hide.
+export function disposeStepSession(model){
+ const state=model?.userData?.nativeStep;
+ if(state?.session) {
+  state.session.dispose();
+  if(activeSession===state.session)activeSession=null;
+ }
+}
+export function writeFilteredStep(model, visible){
+ const state=model?.userData?.nativeStep;
+ if(!state) throw new Error('Pontos STEP-mentés csak eredetileg STEP/STP fájlból lehetséges.');
+ const parts=[];
+ for(const mesh of visible) {
+  const idx=mesh.userData?.stepShapeIndex;
+  if(!Number.isInteger(idx) || !state.shapes[idx])
+   throw new Error('Nem található az eredeti CAD-test; STEP helyett ne mentsünk pontatlan hálót.');
+  parts.push({name:mesh.name||`Alkatrész ${idx+1}`,shape:state.shapes[idx]});
+ }
+ if(!parts.length) throw new Error('Nincs menthető CAD-test.');
+ const bytes=state.session.writeStepDocument([{name:'JOB Viewer – kiválogatott alkatrészek',children:parts}],{unit:'mm'});
+ if(!bytes?.length)throw new Error('A STEP-író nem hozott létre fájlt.');
+ return bytes;
 }
