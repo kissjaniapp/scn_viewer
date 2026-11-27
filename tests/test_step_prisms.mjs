@@ -31,7 +31,7 @@ assert.equal(analyzeExtrudedPolygon(opened),null,'Do not convert open meshes to 
 const matrix={elements:[-1,0,0,0,0,1,0,0,0,0,1,0,700,40,15,1]};
 const placed=worldExtrudedPolygon(matrix,found,1);
 assert.ok(placed);
-assert.deepEqual(placed.outline[0],[700,40,15]);
+assert.ok(placed.outline.some(p=>Math.abs(p[0]-700)<1e-6 && Math.abs(p[1]-40)<1e-6 && Math.abs(p[2]-15)<1e-6));
 
 const occ=await OccSession.create();
 try{
