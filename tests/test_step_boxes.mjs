@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { analyzeRectangularPrism, boxWorldTransform } from '../viewer/step-boxes.js';
+import { analyzeRectangularPrism, boxWorldTransform, boxWorldPrism } from '../viewer/step-boxes.js';
 import { OccSession } from 'occt.ts';
 
 // Every plane is covered by two triangles; no cutouts or missing faces.
@@ -23,14 +23,41 @@ const matrix={elements:[1,0,0,0,0,1,0,0,0,0,1,0,240,120,60,1]};
 const placed=boxWorldTransform(matrix,box,1);
 assert.deepEqual(placed?.size,[100,80,30]);
 assert.deepEqual(placed?.transform,[1,0,0,240,0,1,0,120,0,0,1,60]);
+
+// A negative determinant is a valid mirrored cabinet component, not an error.
+// Two mirrored axis signs and nested rotations must also preserve placement.
+const identityPrism=boxWorldPrism(matrix,box,1);
+assert.deepEqual(identityPrism.base[0],[240,120,60]);
+assert.deepEqual(identityPrism.extrusion,[0,0,30]);
+assert.equal(identityPrism.volume,240000);
+const mirrorMatrix={elements:[-2,0,0,0, 0,1,0,0, 0,0,1.5,0, 600,15,20,1]};
+const mirrorPrism=boxWorldPrism(mirrorMatrix,box,1);
+assert.ok(mirrorPrism,'Negative X scaling must be supported');
+assert.deepEqual(mirrorPrism.base[0],[600,15,20]);
+assert.deepEqual(mirrorPrism.base[1],[400,15,20]);
+assert.deepEqual(mirrorPrism.extrusion,[0,0,45]);
+assert.equal(mirrorPrism.volume,720000);
+const shearedMatrix={elements:[1,0,0,0, 0.15,1,0,0, 0,0.2,1,0, 50,70,10,1]};
+const shearedPrism=boxWorldPrism(shearedMatrix,box,1);
+assert.ok(shearedPrism,'Nested affine transforms may contain shear');
+assert.ok(Math.abs(shearedPrism.volume-240000)<1e-6);
+assert.equal(boxWorldPrism({elements:Array(16).fill(0)},box,1),null);
 const session=await OccSession.create();
 try {
- const cad=session.makeBox(...placed.size);
- const bytes=session.writeStepDocument([{name:'JOB Viewer selected boards',children:[{name:'Bútorlap',shape:cad,transform:placed.transform}]}],{unit:'mm'});
+ const prisms=[identityPrism,mirrorPrism,shearedPrism];
+ const items=prisms.map((prism,i)=>({
+  name:['Alap téglatest','Tükrözött bútorlap','Nyírt komponens'][i],
+  shape:session.extrude(session.makePolygon(prism.base),prism.extrusion)
+ }));
+ const bytes=session.writeStepDocument([{name:'JOB Viewer selected boards',children:items}],{unit:'mm'});
  assert.match(new TextDecoder().decode(bytes.subarray(0,60)),/ISO-10303-21/);
  const next=session.readStepDocument(bytes,{unit:'mm'});
- assert.equal(session.documentShapeCount,1);
- assert.ok(session.documentShape(0).volume()>239999,'Volume preserved as analytic solid');
+ assert.equal(session.documentShapeCount,3);
+ for(let i=0;i<prisms.length;i++) {
+  const volume=Math.abs(session.documentShape(i).volume());
+  assert.ok(Math.abs(volume-prisms[i].volume)<1,
+    `STEP solid volume mismatch for transformed component ${i}: ${volume}`);
+ }
  assert.ok(next.tree.length);
 } finally {session.dispose();}
 console.log('OK: verified cuboid only, STEP solid reconstruction and exact location');
