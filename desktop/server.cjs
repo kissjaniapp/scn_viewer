@@ -14,6 +14,8 @@ const ASSETS = Object.freeze({
   '/job-viewer-logo.svg': ['job-viewer-logo.svg', 'image/svg+xml'],
   '/occt-import-js.js': ['occt-import-js.js', 'text/javascript; charset=utf-8'],
   '/occt-import-js.wasm': ['occt-import-js.wasm', 'application/wasm'],
+  '/occtjs.js': ['occtjs.js', 'text/javascript; charset=utf-8'],
+  '/occtjs.wasm': ['occtjs.wasm', 'application/wasm'],
 });
 function jsonReply(res, code, value) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
