@@ -1,7 +1,7 @@
 import { decodeScn } from './scn-parser.js';
 import { uncheckedRoots, countMeshes } from './model-edit.js';
 import { decodeSkpToGlb } from './skp-loader.js';
-import { readStep } from './step-loader.js';
+import { readStep, writeFilteredStep, disposeStepSession } from './step-loader.js';
 import { classifyScnRecord } from './scn-layout.js';
 import { discoverScnScenes } from './scn-scenes.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
@@ -268,6 +268,7 @@ function disposeModel() {
  clearMeasure();
  clearEdges();
  if (model) {
+  disposeStepSession(model);
   scene.remove(model);
   model.traverse(obj => {
    if (obj.geometry) obj.geometry.dispose();
@@ -278,6 +279,7 @@ function disposeModel() {
  scnMaterials=null;
  model = null;
  modelBox = null;
+ $('saveStepModel').disabled=true;
  $('saveFilteredModel').disabled=true;
  $('deleteUnchecked').disabled=true;
 }
@@ -288,6 +290,7 @@ function prepareModel(group, name) {
  meshCountCache = new WeakMap();
  model = group;
  $('saveFilteredModel').disabled=false;
+ $('saveStepModel').disabled=!model.userData.nativeStep;
  const native = model.userData.scnState;
  scnLayout = native ? {data:native.data,layout:native.layout} : null;
  hiddenObjects.clear();
@@ -646,6 +649,34 @@ function cloneGeometryForExport(source) {
  if(!clone.isMesh && !clone.isLine && clone.children.length===0) return null;
  return clone;
 }
+// Real analytic STEP export from the OCCT handles kept at import time.
+async function saveSelectedStep() {
+ if(!model?.userData.nativeStep) return notify('STEP exportáláshoz eredeti STEP/STP forrásfájl szükséges.');
+ const meshes=[];
+ model.traverse(obj=>{if(obj.isMesh&&isVisibleInHierarchy(obj)&&Number.isInteger(obj.userData.stepShapeIndex)) meshes.push(obj);});
+ if(!meshes.length)return notify('Nincs látható CAD-test a STEP mentéshez.');
+ const button=$('saveStepModel');
+ button.disabled=true;
+ try {
+  const bytes=writeFilteredStep(model,meshes);
+  const blob=new Blob([bytes],{type:'application/step'});
+  const url=URL.createObjectURL(blob);
+  try {
+   const link=document.createElement('a');
+   const name=(originName||'rajz').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,70);
+   link.href=url;
+   link.download=`${name}_kivalogatott.step`;
+   document.body.appendChild(link);
+   link.click();
+   link.remove();
+  } finally {setTimeout(()=>URL.revokeObjectURL(url),30000);}
+  notify(`STEP fájl mentve: ${meshes.length} eredeti CAD-test. Megnyitható Fusionban.`);
+ } catch(err) {
+  console.error('STEP export',err);
+  notify('STEP mentési hiba: '+(err?.message||String(err)));
+ } finally {button.disabled=!model?.userData.nativeStep;}
+}
+
 async function saveFilteredModel() {
  if(!model) return notify('Előbb nyiss meg egy rajzot!');
  const btn=$('saveFilteredModel');
@@ -1504,6 +1535,7 @@ $('showAllToolbar').addEventListener('click', ()=>{$('showAllObjects').click();}
 $('hideSelected').addEventListener('click', hideSelectedObject);
 $('deleteUnchecked').addEventListener('click',deleteUncheckedObjects);
 $('saveFilteredModel').addEventListener('click',saveFilteredModel);
+$('saveStepModel').addEventListener('click',saveSelectedStep);
 $('showAllObjects').addEventListener('click', () => {
  for(const object of hiddenObjects) object.visible=true;
  hiddenObjects.clear();
