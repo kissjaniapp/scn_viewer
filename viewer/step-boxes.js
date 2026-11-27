@@ -64,3 +64,44 @@ export function boxWorldTransform(matrixWorld,box,unit=1){
  ];
  return {size,transform};
 }
+
+/** Exact affine world-space prism, including mirrors, negative scales and
+ * shears in nested SketchUp component transforms. Does not guess dimensions
+ * from a world-aligned bounding box: corners are transformed directly.
+ *
+ * World coordinates below are converted to millimetres. A B-Rep extrusion
+ * recreates the actual parallelepiped instead of imposing a rotation-only
+ * STEP placement (which cannot represent reflected/sheared transforms).
+ */
+export function boxWorldPrism(matrixWorld,box,unit=1) {
+ if(!Number.isFinite(unit)||unit<=0 || !box?.min || !box?.size) return null;
+ const e=matrixWorld?.elements;
+ if(!e||e.length!==16 || !Array.from(e).every(Number.isFinite))return null;
+ const [x,y,z]=box.min;
+ const [dx,dy,dz]=box.size;
+ if([dx,dy,dz].some(v=>!Number.isFinite(v)||v<=0))return null;
+ // Matrix4 is column-major in Three.js; transform all corners exactly.
+ const transform=(px,py,pz)=>[
+  (e[0]*px+e[4]*py+e[8]*pz+e[12])*unit,
+  (e[1]*px+e[5]*py+e[9]*pz+e[13])*unit,
+  (e[2]*px+e[6]*py+e[10]*pz+e[14])*unit
+ ];
+ // Reject unsupported projective matrices rather than exporting silently
+ // incorrect geometry. Normal component and nested CAD instance transforms
+ // are affine (last row 0,0,0,1).
+ if(Math.abs(e[3])+Math.abs(e[7])+Math.abs(e[11])>1e-9 || Math.abs(e[15]-1)>1e-9)return null;
+ const a=transform(x,y,z),b=transform(x+dx,y,z),c=transform(x+dx,y+dy,z),d=transform(x,y+dy,z);
+ const top=transform(x,y,z+dz);
+ const extrusion=top.map((v,i)=>v-a[i]);
+ const u=b.map((v,i)=>v-a[i]),v=d.map((w,i)=>w-a[i]);
+ const cross=[
+  u[1]*v[2]-u[2]*v[1],
+  u[2]*v[0]-u[0]*v[2],
+  u[0]*v[1]-u[1]*v[0]
+ ];
+ const norm=(w)=>Math.hypot(...w);
+ const volume6=Math.abs(cross.reduce((sum,w,i)=>sum+w*extrusion[i],0));
+ const expected=norm(u)*norm(v)*norm(extrusion);
+ if(expected<1e-10 || volume6/expected<1e-6)return null;
+ return {base:[a,b,c,d],extrusion,volume:volume6};
+}
