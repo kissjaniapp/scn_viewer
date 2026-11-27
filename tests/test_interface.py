@@ -89,7 +89,7 @@ assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
 assert "const step=await readStep(await file.arrayBuffer())" in js
 assert "Az F3D Fusion saját archívuma" in js
 assert "job-viewer-logo.svg" in html
-assert "JOB Viewer v2.7.0" in html
+assert "JOB Viewer v2.7.1" in html
 
 # Editing the working copy: delete only unchecked subtrees and export a
 # re-openable GLB, never pretend tessellated geometry is a true STEP solid.
@@ -110,3 +110,8 @@ assert 'id="saveStepModel"' in html
 assert "writeFilteredStep(model,meshes)" in js
 assert "stepShapeIndex" in js
 assert "kivalogatott.step" in js
+
+# STEP export works for exact native CAD and verified cuboids after deletion.
+assert "writeReconstructedBoxStep(model,meshes,mmPerUnit)" in js
+assert "$('saveStepModel').disabled=false" in js
+assert "button.disabled=!model;" in js
