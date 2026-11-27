@@ -1,7 +1,7 @@
 import { decodeScn } from './scn-parser.js';
 import { uncheckedRoots, countMeshes } from './model-edit.js';
 import { decodeSkpToGlb } from './skp-loader.js';
-import { readStep, writeFilteredStep, disposeStepSession } from './step-loader.js';
+import { readStep, writeFilteredStep, writeReconstructedBoxStep, disposeStepSession } from './step-loader.js';
 import { classifyScnRecord } from './scn-layout.js';
 import { discoverScnScenes } from './scn-scenes.js';
 import { catalogPreviewType, makeCatalogPreview } from './scn-structure.js';
@@ -290,7 +290,8 @@ function prepareModel(group, name) {
  meshCountCache = new WeakMap();
  model = group;
  $('saveFilteredModel').disabled=false;
- $('saveStepModel').disabled=!model.userData.nativeStep;
+ $('saveStepModel').disabled=false;
+ $('saveStepModel').title=model.userData.nativeStep ? 'Eredeti CAD-testek mentése STEP-be' : 'Téglatest alakú, igazolható alkatrészek átalakítása valódi STEP-testté';
  const native = model.userData.scnState;
  scnLayout = native ? {data:native.data,layout:native.layout} : null;
  hiddenObjects.clear();
@@ -617,7 +618,7 @@ function deleteUncheckedObjects() {
  if(model.userData.nativeScn) setScnVisible({refit:false});
  else {renderStructureTree();refitCameraToVisibleObjects();}
  toggleEdges($('showEdges').checked);
- $('fileHint').textContent=`${meshCount} kikapcsolt 3D objektum törölve a munkapéldányból. Mentsd a megmaradókat GLB-be; az eredeti fájl nem módosult.`;
+ $('fileHint').textContent=`${meshCount} kikapcsolt 3D objektum törölve. A STEP-mentés az eredeti CAD-testeket vagy az ellenőrzött téglatesteket menti; más geometriára figyelmeztet. Az eredeti fájl sértetlen.`;
  notify(`Törölve: ${meshCount} 3D objektum. A kiválogatott rajz menthető.`);
 }
 
@@ -651,14 +652,22 @@ function cloneGeometryForExport(source) {
 }
 // Real analytic STEP export from the OCCT handles kept at import time.
 async function saveSelectedStep() {
- if(!model?.userData.nativeStep) return notify('STEP exportáláshoz eredeti STEP/STP forrásfájl szükséges.');
+ if(!model) return notify('Előbb nyiss meg egy rajzot!');
  const meshes=[];
- model.traverse(obj=>{if(obj.isMesh&&isVisibleInHierarchy(obj)&&Number.isInteger(obj.userData.stepShapeIndex)) meshes.push(obj);});
- if(!meshes.length)return notify('Nincs látható CAD-test a STEP mentéshez.');
+ model.traverse(obj=>{
+  if(obj.isMesh && isVisibleInHierarchy(obj) &&
+    (model.userData.nativeStep ? Number.isInteger(obj.userData.stepShapeIndex) : true))
+   meshes.push(obj);
+ });
+ if(!meshes.length) return notify('Nincs látható alkatrész a STEP-mentéshez.');
  const button=$('saveStepModel');
  button.disabled=true;
  try {
-  const bytes=writeFilteredStep(model,meshes);
+  // STEP/STP sources retain exact analytic OCCT B-Rep shapes. Mesh sources
+  // require verified cuboid reconstruction; anything else is rejected.
+  const bytes=model.userData.nativeStep
+   ? writeFilteredStep(model,meshes)
+   : await writeReconstructedBoxStep(model,meshes,mmPerUnit);
   const blob=new Blob([bytes],{type:'application/step'});
   const url=URL.createObjectURL(blob);
   try {
@@ -670,11 +679,12 @@ async function saveSelectedStep() {
    link.click();
    link.remove();
   } finally {setTimeout(()=>URL.revokeObjectURL(url),30000);}
-  notify(`STEP fájl mentve: ${meshes.length} eredeti CAD-test. Megnyitható Fusionban.`);
+  notify(`STEP fájl mentve: ${meshes.length} CAD-test. A Fusionban megnyitható.`);
  } catch(err) {
   console.error('STEP export',err);
   notify('STEP mentési hiba: '+(err?.message||String(err)));
- } finally {button.disabled=!model?.userData.nativeStep;}
+  $('fileHint').textContent='STEP mentés sikertelen: '+(err?.message||String(err));
+ } finally {button.disabled=!model;}
 }
 
 async function saveFilteredModel() {
