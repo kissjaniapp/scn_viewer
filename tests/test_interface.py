@@ -89,7 +89,7 @@ assert "new ThreeMFLoader().parse(await file.arrayBuffer())" in js
 assert "const step=await readStep(await file.arrayBuffer())" in js
 assert "Az F3D Fusion saját archívuma" in js
 assert "job-viewer-logo.svg" in html
-assert "JOB Viewer v2.7.2" in html
+assert "JOB Viewer v2.7.3" in html
 
 # Editing the working copy: delete only unchecked subtrees and export a
 # re-openable GLB, never pretend tessellated geometry is a true STEP solid.
