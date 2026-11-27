@@ -2,7 +2,7 @@
   "name": "job-viewer-desktop",
   "productName": "JOB Viewer",
   "private": true,
-  "version": "2.7.1",
+  "version": "2.7.2",
   "main": "desktop/main.cjs",
   "description": "Offline CAD and furniture model viewer for SCN, SKP, 3MF, STEP and other mesh files, with precise dimension annotations",
   "scripts": {
