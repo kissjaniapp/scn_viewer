@@ -17,7 +17,7 @@ try {
  const text=new TextDecoder().decode(bytes.subarray(0,180));
  assert.match(text,/ISO-10303-21/i,'File must be STEP Part 21, not GLB/STL');
  const roundtrip=occ.readStepDocument(bytes,{unit:'mm'});
- assert.equal(occ.documentShapeCount(),2,'Selection must export precisely two CAD parts');
+ assert.equal(occ.documentShapeCount,2,'Selection must export precisely two CAD parts');
  const volume=occ.documentShape(0).volume();
  assert.ok(volume>4_000_000,'Exact CAD B-Rep volume survives STEP serialization');
  assert.ok(roundtrip.tree.length>0,'Assembly metadata survives STEP');
