@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { OccSession } from 'occt.ts';
 import { analyzeRectangularPrism, boxWorldPrism } from './step-boxes.js';
+import { analyzeExtrudedPolygon, worldExtrudedPolygon } from './step-prisms.js';
 
 let activeSession = null;
 const wasmPath = new URL('./occtjs.wasm', import.meta.url).href;
@@ -91,25 +92,41 @@ export async function writeReconstructedBoxStep(model,visible,mmPerUnit) {
  const validated=[];
  for(const mesh of visible) {
   if(mesh.userData?.scnApproximate || ['reference','catalog-part','fitting'].includes(mesh.userData?.scnRole))
-   throw new Error(`A(z) "${mesh.name||'ismeretlen'}" csak becsült vagy katalógusgeometria, ezért nem alakítható hiteles STEP-testté.`);
+   throw new Error(`A(z) "${mesh.name||'ismeretlen'}" csak becsült katalógusgeometria, ezért nem alakítható hiteles STEP-testté.`);
   const box=analyzeRectangularPrism(mesh.geometry);
-  if(!box) throw new Error(`A(z) "${mesh.name||'ismeretlen'}" nem igazolt teljes téglatest (pl. kivágás, görbe vagy hiányos felület). Pontatlan STEP helyett az export megszakadt.`);
-  const prism=boxWorldPrism(mesh.matrixWorld,box,mmPerUnit);
-  if(!prism) throw new Error(`A(z) "${mesh.name||'ismeretlen'}" degenerált, projektív vagy nulla térfogatú transzformációjú.`);
-  validated.push({name:mesh.userData.partName||mesh.name||'Alkatrész',...prism});
+  if(box){
+   const prism=boxWorldPrism(mesh.matrixWorld,box,mmPerUnit);
+   if(!prism)throw new Error(`A(z) "${mesh.name||'ismeretlen'}" degenerált térfogatú transzformációjú.`);
+   validated.push({name:mesh.userData.partName||mesh.name||'Alkatrész',type:'box',...prism});
+   continue;
+  }
+  // Not all furniture boards are six-sided boxes: a verified closed and
+  // linearly extruded polygon may include L corners, notches and through-holes.
+  const local=analyzeExtrudedPolygon(mesh.geometry);
+  const prism=local && worldExtrudedPolygon(mesh.matrixWorld,local,mmPerUnit);
+  if(!prism)
+   throw new Error(`A(z) "${mesh.name||'ismeretlen'}" nem igazolt zárt téglatest vagy kihúzott poligon. Az eredeti alkatrész geometriai vizsgálata szükséges; a hibás STEP mentést leállítottam.`);
+  validated.push({name:mesh.userData.partName||mesh.name||'Alkatrész',type:'polygon',...prism});
  }
  const session=await OccSession.create({moduleUrl:modulePath,wasmUrl:wasmPath});
  try {
   const children=validated.map(part=>{
-   // OCC creates an actual solid from the transformed quadrilateral and the
-   // world-space extrusion vector. This is exact even for negative scale,
-   // mirrors, rotations, nonuniform scale or a genuinely sheared instance.
-   const profile=session.makePolygon(part.base);
-   const solid=session.extrude(profile,part.extrusion);
+   let solid;
+   if(part.type==='box'){
+    const profile=session.makePolygon(part.base);
+    solid=session.extrude(profile,part.extrusion);
+   }else{
+    const outline=session.makePolygon(part.outline);
+    const holes=part.holes.map(loop=>session.makePolygon(loop));
+    const face=session.makeFace(outline,holes);
+    solid=session.extrude(face,part.extrusion);
+   }
+   if(!solid.isValid() || session.solids(solid).length===0 || Math.abs(solid.volume())<1e-8)
+    throw new Error(`A(z) "${part.name}" nem állítható elő érvényes STEP-szilárdtestként.`);
    return {name:part.name,shape:solid};
   });
-  const bytes=session.writeStepDocument([{name:'JOB Viewer – kiválogatott téglatestek',children}],{unit:'mm'});
-  if(!bytes?.length) throw new Error('A STEP motor nem hozott létre fájlt.');
+  const bytes=session.writeStepDocument([{name:'JOB Viewer – kiválogatott CAD-alkatrészek',children}],{unit:'mm'});
+  if(!bytes?.length)throw new Error('A STEP motor nem hozott létre fájlt.');
   return bytes;
- } finally { session.dispose(); }
+ } finally {session.dispose();}
 }
